@@ -23,8 +23,8 @@
 # Any file in /RawContent dir will be managed by git lfs.
 !/RawContent/**/*
 
-Binaries/
-Intermediate/Build
+**/Binaries/
+**/Intermediate/Build
 
 # OS/platform generated files.
 
