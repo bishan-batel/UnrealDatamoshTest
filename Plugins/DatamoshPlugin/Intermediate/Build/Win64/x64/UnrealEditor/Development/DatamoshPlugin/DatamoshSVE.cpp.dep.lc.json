@@ -1,0 +1,15 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\source\\datamoshsceneviewextension\\private\\datamoshsve.cpp",
+        "ProvidedModule": "",
+        "PCH": "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\intermediate\\build\\win64\\x64\\datamoshtesteditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.cpp20.h.pch",
+        "Includes": [
+            "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\datamoshplugin\\definitions.datamoshplugin.h",
+            "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\intermediate\\build\\win64\\x64\\datamoshtesteditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.cpp20.h",
+            "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\source\\datamoshsceneviewextension\\private\\datamoshsve.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

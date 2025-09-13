@@ -1,0 +1,12 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UnrealEditor-DatamoshSceneViewExtension.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Intermediate\Build\Win64\x64\DatamoshTestEditor\Development\UnrealEd\SharedPCH.UnrealEd.Project.ValApi.Cpp20.h.obj"
+"C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshSceneViewExtension\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshSceneViewExtension\DatamoshSceneViewExtension.cpp.obj"
+"C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshSceneViewExtension\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshSceneViewExtension\Default.rc2.res"
+/OUT:"C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshSceneViewExtension\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshSceneViewExtension\UnrealEditor-DatamoshSceneViewExtension.lib"

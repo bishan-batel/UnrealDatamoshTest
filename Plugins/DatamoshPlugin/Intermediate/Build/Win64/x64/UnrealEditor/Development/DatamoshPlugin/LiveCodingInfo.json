@@ -1,0 +1,12 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.DatamoshPlugin.cpp.obj": [
+			"DatamoshPlugin.init.gen.cpp.obj",
+			"DatamoshSubsystem.gen.cpp.obj",
+			"DatamoshPlugin.cpp.obj",
+			"DatamoshSubsystem.cpp.obj",
+			"FDatamoshSceneViewExtension.cpp.obj"
+		]
+	}
+}
