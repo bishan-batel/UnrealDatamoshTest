@@ -65,7 +65,12 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		return SceneColor;
 	}
 
+	const FScreenPassTexture& SceneVelocity = FScreenPassTexture::CopyFromSlice(
+		GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::Velocity)
+	);
+
 	const FScreenPassTextureViewport SceneColorViewport{SceneColor};
+	const FScreenPassTextureViewport SceneVelocityViewport{SceneVelocity};
 
 	RDG_EVENT_SCOPE(GraphBuilder, "Custom post process effect");
 
@@ -94,8 +99,12 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 	// Input is the SceneColor from PostProcess Material Inputs
 	PassParameters->OriginalSceneColor = SceneColor.Texture;
 
+	PassParameters->Velocity = SceneVelocity.Texture;
+
 	// Use ScreenPassTextureViewportParameters so we don't need to calculate these ourselves
 	PassParameters->SceneColorViewport = GetScreenPassTextureViewportParameters(SceneColorViewport);
+
+	PassParameters->SceneColorViewport = GetScreenPassTextureViewportParameters(SceneVelocityViewport);
 
 	const FIntPoint PassViewSize = SceneColor.ViewRect.Size();
 

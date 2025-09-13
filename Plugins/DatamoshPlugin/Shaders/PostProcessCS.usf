@@ -12,6 +12,8 @@
 // SceneColor texture
 Texture2D OriginalSceneColor;
 
+SCREEN_PASS_TEXTURE_VIEWPORT(SceneVelocityViewport)
+
 // SceneColor Viewport parameters
 SCREEN_PASS_TEXTURE_VIEWPORT(SceneColorViewport)
 
@@ -30,12 +32,15 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	
     // Calculate SampleUV with viewport parameters
     float2 sampleUV = (float2(SceneColorViewport_ViewportMin) + (DispatchThreadId + 0.5)) * SceneColorViewport_ExtentInverse;
+	float2 velocityUV = (float2(SceneVelocityViewport_ViewportMin) + (DispatchThreadId + 0.5)) * SceneVelocityViewport_ExtentInverse;
 
     // sample OriginalColor
     float4 OriginalColor = OriginalSceneColor.SampleLevel(GlobalPointClampedSampler, sampleUV, 0);
 
     // To test that everything is working, switch Red and Blue
-    float4 OutputColor = float4(OriginalColor.z, OriginalColor.y, OriginalColor.x, OriginalColor.w);
+    float4 OutputColor = float4(OriginalColor.x, OriginalColor.y, OriginalColor.z, OriginalColor.w);
+
+	OutputColor.x = abs(clamp(Velocity.Sample(velocityUV) ,-1, 1.));
 
     // Write output
     Output[SceneColorViewport_ViewportMin + DispatchThreadId] = OutputColor;
