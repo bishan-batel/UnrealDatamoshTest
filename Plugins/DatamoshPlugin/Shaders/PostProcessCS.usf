@@ -11,11 +11,13 @@
 
 // SceneColor texture
 Texture2D OriginalSceneColor;
+Texture2D Velocity;
 
-SCREEN_PASS_TEXTURE_VIEWPORT(SceneVelocityViewport)
 
 // SceneColor Viewport parameters
 SCREEN_PASS_TEXTURE_VIEWPORT(SceneColorViewport)
+
+SCREEN_PASS_TEXTURE_VIEWPORT(SceneVelocityViewport)
 
 // Output
 RWTexture2D<float4> Output;
@@ -40,7 +42,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
     // To test that everything is working, switch Red and Blue
     float4 OutputColor = float4(OriginalColor.x, OriginalColor.y, OriginalColor.z, OriginalColor.w);
 
-	OutputColor.x = abs(clamp(Velocity.Sample(velocityUV) ,-1, 1.));
+	OutputColor.x = abs(clamp(length(Velocity.SampleLevel(GlobalPointClampedSampler, velocityUV, 0)), -1, 10.)) / 10.;
 
     // Write output
     Output[SceneColorViewport_ViewportMin + DispatchThreadId] = OutputColor;
