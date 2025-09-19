@@ -4,6 +4,9 @@
 #include "DatamoshSubsystem.h"
 
 #include "FDatamoshSceneViewExtension.h"
+#include "ParticleHelper.h"
+#include "Framework/Notifications/NotificationManager.h"
+#include "Widgets/Notifications/SNotificationList.h"
 
 void UDatamoshSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -24,7 +27,7 @@ void UDatamoshSubsystem::Deinitialize()
 			const FSceneViewExtensionContext& Context
 		) -> TOptional<bool>
 			{
-				return TOptional<bool>{false};
+				return TOptional{false};
 			};
 
 		SceneExtension->IsActiveThisFrameFunctions.Add(IsActiveFunctor);

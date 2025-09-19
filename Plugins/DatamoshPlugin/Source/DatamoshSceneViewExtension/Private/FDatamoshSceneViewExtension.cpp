@@ -1,5 +1,8 @@
 #include "FDatamoshSceneViewExtension.h"
 
+#include "SceneTextures.h"
+#include "SWarningOrErrorBox.h"
+#include "Framework/Notifications/NotificationManager.h"
 #include "PostProcess/PostProcessMaterialInputs.h"
 
 
@@ -29,6 +32,7 @@ void FDatamoshSceneViewExtension::SetupViewFamily(FSceneViewFamily& InViewFamily
 
 void FDatamoshSceneViewExtension::SetupView(FSceneViewFamily& InViewFamily, FSceneView& InView)
 {
+	InView.bCameraMotionBlur = TOptional<bool>{true};
 }
 
 void FDatamoshSceneViewExtension::BeginRenderViewFamily(FSceneViewFamily& InViewFamily)
@@ -41,6 +45,10 @@ void FDatamoshSceneViewExtension::SubscribeToPostProcessingPass(
 	const bool bIsPassEnabled
 )
 {
+	if (not bIsPassEnabled)
+	{
+		return;
+	}
 	if (Pass == EPostProcessingPass::MotionBlur)
 	{
 		InOutPassCallbacks.Add(
@@ -86,8 +94,8 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		OutputDesc.Flags |= TexCreate_UAV;
 		OutputDesc.Flags &= ~(TexCreate_RenderTargetable | TexCreate_FastVRAM);
 
-		FLinearColor ClearColor(0., 0., 0., 0.);
-		OutputDesc.ClearValue = FClearValueBinding(ClearColor);
+		FLinearColor ClearColor{0., 0., 0., 0.};
+		OutputDesc.ClearValue = FClearValueBinding{ClearColor};
 	}
 
 	// Create target texture
@@ -95,6 +103,24 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 
 	// Set the shader parameters
 	FDatamoshShader::FParameters* PassParameters = GraphBuilder.AllocParameters<FDatamoshShader::FParameters>();
+
+	FRDGTexture* PreviousFrameTextureRef{nullptr};
+
+	if (PreviousFramePooledTexture == nullptr or PreviousViewRect.Size() != SceneColor.ViewRect.Size())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Creating First PreviousFramePoolTexture External Texture"));
+		PreviousFramePooledTexture = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
+		PreviousFrameTextureRef = GraphBuilder.RegisterExternalTexture(PreviousFramePooledTexture);
+
+		PreviousViewRect = SceneColor.ViewRect;
+	}
+	else
+	{
+		PreviousFrameTextureRef = GraphBuilder.RegisterExternalTexture(PreviousFramePooledTexture);
+	}
+
+
+	PassParameters->PreviousFrame = PreviousFrameTextureRef;
 
 	// Input is the SceneColor from PostProcess Material Inputs
 	PassParameters->OriginalSceneColor = SceneColor.Texture;
@@ -111,19 +137,25 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 	// Create UAV from Target Texture
 	PassParameters->Output = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(OutputTexture));
 
+
 	// Set Compute Shader and execute
-	const FIntVector GroupCount = FComputeShaderUtils::GetGroupCount(PassViewSize,
-	                                                                 FComputeShaderUtils::kGolden2DGroupSize);
+	const FIntVector GroupCount = FComputeShaderUtils::GetGroupCount(
+		PassViewSize,
+		FComputeShaderUtils::kGolden2DGroupSize
+	);
+
 
 	TShaderMapRef<FDatamoshShader> ComputeShader{GlobalShaderMap};
 
 	FComputeShaderUtils::AddPass(
 		GraphBuilder,
-		RDG_EVENT_NAME("Custom SceneViewExtension Post Processing CS Shader %dx%d", PassViewSize.X, PassViewSize.Y),
+		RDG_EVENT_NAME("Datamosh SceneViewExtension Post Processing CS Shader %dx%d", PassViewSize.X, PassViewSize.Y),
 		ComputeShader,
 		PassParameters,
 		GroupCount
 	);
+
+	AddCopyTexturePass(GraphBuilder, OutputTexture, PreviousFrameTextureRef);
 
 	// Copy the output texture back to SceneColor
 	// Returning the new texture as ScreenPassTexture doesn't work, so this is pretty fast alternative

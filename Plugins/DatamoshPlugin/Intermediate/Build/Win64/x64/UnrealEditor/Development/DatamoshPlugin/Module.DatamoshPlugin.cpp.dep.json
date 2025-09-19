@@ -9,7 +9,17 @@
             "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\intermediate\\build\\win64\\unrealeditor\\inc\\datamoshplugin\\uht\\datamoshplugin.init.gen.cpp",
             "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\intermediate\\build\\win64\\unrealeditor\\inc\\datamoshplugin\\uht\\datamoshsubsystem.gen.cpp",
             "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\source\\datamoshsceneviewextension\\private\\datamoshsubsystem.h",
-            "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\intermediate\\build\\win64\\unrealeditor\\inc\\datamoshplugin\\uht\\datamoshsubsystem.generated.h"
+            "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\intermediate\\build\\win64\\unrealeditor\\inc\\datamoshplugin\\uht\\datamoshsubsystem.generated.h",
+            "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\source\\datamoshsceneviewextension\\private\\datamoshplugin.cpp",
+            "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\source\\datamoshsceneviewextension\\public\\datamoshplugin.h",
+            "c:\\program files\\epic games\\ue_5.4\\engine\\source\\runtime\\projects\\public\\interfaces\\ipluginmanager.h",
+            "c:\\program files\\epic games\\ue_5.4\\engine\\source\\runtime\\projects\\public\\plugindescriptor.h",
+            "c:\\program files\\epic games\\ue_5.4\\engine\\source\\runtime\\projects\\public\\custombuildsteps.h",
+            "c:\\program files\\epic games\\ue_5.4\\engine\\source\\runtime\\projects\\public\\localizationdescriptor.h",
+            "c:\\program files\\epic games\\ue_5.4\\engine\\source\\runtime\\projects\\public\\moduledescriptor.h",
+            "c:\\program files\\epic games\\ue_5.4\\engine\\source\\runtime\\projects\\public\\plugindisalloweddescriptor.h",
+            "c:\\program files\\epic games\\ue_5.4\\engine\\source\\runtime\\projects\\public\\pluginreferencedescriptor.h",
+            "c:\\program files\\epic games\\ue_5.4\\engine\\source\\runtime\\projects\\public\\versescope.h"
         ],
         "ImportedModules": [],
         "ImportedHeaderUnits": []

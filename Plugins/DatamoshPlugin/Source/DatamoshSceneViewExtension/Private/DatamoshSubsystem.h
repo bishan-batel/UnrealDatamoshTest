@@ -16,6 +16,7 @@ class DATAMOSHPLUGIN_API UDatamoshSubsystem : public UEngineSubsystem
 
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
 	virtual void Deinitialize() override;
 
 private:

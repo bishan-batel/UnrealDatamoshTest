@@ -11,6 +11,7 @@
 
 // SceneColor texture
 Texture2D OriginalSceneColor;
+Texture2D PreviousFrame;
 Texture2D Velocity;
 
 
@@ -22,28 +23,115 @@ SCREEN_PASS_TEXTURE_VIEWPORT(SceneVelocityViewport)
 // Output
 RWTexture2D<float4> Output;
 
+float4 GaussianSample(
+	const Texture2D Texture,
+	const float2 screen_size,
+	const float2 UvCenter
+)
+{
+	const float Guassian_Kernel[9] = {
+		1.0 / 16, 2.0 / 16, 1.0 / 16,
+		2.0 / 16, 4.0 / 16, 2.0 / 16,
+		1.0 / 16, 2.0 / 16, 1.0 / 16
+	};
+
+	const uint GaussianKernelSize = 9;
+
+	const float2 offset = float2(1., 1.) / screen_size;
+
+	const float2 offsets[9] = {
+		float2(-offset.x, offset.y), // top-left
+		float2(0.0f, offset.y), // top-center
+		float2(offset.x, offset.y), // top-right
+		float2(-offset.x, 0.0f), // center-left
+		float2(0.0f, 0.0f), // center-center
+		float2(offset.x, 0.0f), // center-right
+		float2(-offset.x, -offset.y), // bottom-left
+		float2(0.0f, -offset.y), // bottom-center
+		float2(offset.x, -offset.y) // bottom-right
+	};
+
+
+	float4 GuassianSample = float4(0., 0., 0., 0.);
+
+	for (uint i = 0; i < GaussianKernelSize; i++)
+	{
+		float2 Uv = UvCenter + offsets[i] * Guassian_Kernel[i];
+		GuassianSample += Texture.SampleLevel(GlobalPointClampedSampler, Uv, 0);
+	}
+
+	// return GuassianSample;
+	return Texture.SampleLevel(GlobalPointClampedSampler, UvCenter, 0);
+}
+
 // Compute Shader code
 [numthreads(THREADS_X, THREADS_Y, THREADS_Z)]
 void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 {
 	// Check that we are in scope
-    if (any(DispatchThreadId >= SceneColorViewport_ViewportMax))
-    {
-        return;
-    }
-	
-    // Calculate SampleUV with viewport parameters
-    float2 sampleUV = (float2(SceneColorViewport_ViewportMin) + (DispatchThreadId + 0.5)) * SceneColorViewport_ExtentInverse;
-	float2 velocityUV = (float2(SceneVelocityViewport_ViewportMin) + (DispatchThreadId + 0.5)) * SceneVelocityViewport_ExtentInverse;
+	if (any(DispatchThreadId >= SceneColorViewport_ViewportMax))
+	{
+		return;
+	}
 
-    // sample OriginalColor
-    float4 OriginalColor = OriginalSceneColor.SampleLevel(GlobalPointClampedSampler, sampleUV, 0);
+	// Calculate SampleUV with viewport parameters
+	const float2 SceneColorUV =
+		(float2(SceneColorViewport_ViewportMin) + (DispatchThreadId + 0.5)) * SceneColorViewport_ExtentInverse;
 
-    // To test that everything is working, switch Red and Blue
-    float4 OutputColor = float4(OriginalColor.x, OriginalColor.y, OriginalColor.z, OriginalColor.w);
+	const float2 VelocityUV =
+		SceneColorUV * (SceneVelocityViewport_UVViewportMax - SceneVelocityViewport_UVViewportMin) +
+		SceneVelocityViewport_ViewportMin;
 
-	OutputColor.x = abs(clamp(length(Velocity.SampleLevel(GlobalPointClampedSampler, velocityUV, 0)), -1, 10.)) / 10.;
+	float4 FragmentVelocity = GaussianSample(
+		Velocity,
+		float2(SceneVelocityViewport_ViewportMax - SceneVelocityViewport_ViewportMin),
+		VelocityUV
+	);
 
-    // Write output
-    Output[SceneColorViewport_ViewportMin + DispatchThreadId] = OutputColor;
+	// velocity = 4.008 * velocity - 0.5 * 4.008;
+
+	float2 OffsetUV = SceneColorUV;
+
+	const bool HasVelocityOffset = length2(FragmentVelocity) > 0.f;
+
+	if (HasVelocityOffset)
+	{
+		// decode velocity
+		FragmentVelocity.xyz = DecodeVelocityFromTexture(FragmentVelocity).xyz;
+
+		OffsetUV -= (FragmentVelocity.xy * 2.0);
+
+		OffsetUV = clamp(OffsetUV, SceneColorViewport_UVViewportMin, SceneColorViewport_UVViewportMax);
+	}
+
+	// sample OriginalColor
+	const float4 OriginalColor = OriginalSceneColor.SampleLevel(GlobalPointClampedSampler, SceneColorUV, 0);
+
+	// To test that everything is working, switch Red and Blue
+	float4 OutputColor = OriginalColor;
+
+	const float4 PrevColor = PreviousFrame.SampleLevel(GlobalPointClampedSampler, OffsetUV, 0);
+
+	if (HasVelocityOffset)
+	{
+		OutputColor = PrevColor;
+
+		// OutputColor = lerp(
+		// 	PrevColor,
+		// 	OriginalSceneColor.SampleLevel(GlobalPointClampedSampler, SceneColorUV, 0),
+		// 	clamp(length(VelocityUV) * 1.f, 0.f, 1.f)
+		// );
+	}
+
+	Output[SceneColorViewport_ViewportMin + DispatchThreadId] = OutputColor;
+	// Output[SceneColorViewport_ViewportMin + DispatchThreadId] = PrevColor;
+
+	// Output[SceneColorViewport_ViewportMin + DispatchThreadId] = Velocity.SampleLevel(GlobalPointClampedSampler, VelocityUV, 0);
+
+	// const float4 OriginalColorNoOffset = OriginalSceneColor.SampleLevel(GlobalPointClampedSampler, SceneColorUV, 0);
+
+	// Write output
+	// Output[SceneColorViewport_ViewportMin + DispatchThreadId] = OutputColor;
+	// Output[SceneColorViewport_ViewportMin + DispatchThreadId] = float4(abs(OriginalColorNoOffset - PrevColor).xyz, 1.);
+	// Output[SceneColorViewport_ViewportMin + DispatchThreadId] = OutputColor;
 }

@@ -31,6 +31,10 @@ public:
 		const FSceneView& View,
 		const FPostProcessMaterialInputs& Inputs
 	);
+
+private:
+	TRefCountPtr<IPooledRenderTarget> PreviousFramePooledTexture, VelocityBuffer;
+	FIntRect PreviousViewRect;
 };
 
 class DATAMOSHPLUGIN_API FDatamoshShader : public FGlobalShader
@@ -41,6 +45,7 @@ public:
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters,)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, OriginalSceneColor)
+		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, PreviousFrame)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, Velocity)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, Output)
 		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, SceneColorViewport)
