@@ -2,3 +2,4 @@
 #include "C:/Users/schro/Documents/Unreal Projects/DatamoshTest/Plugins/DatamoshPlugin/Intermediate/Build/Win64/UnrealEditor/Inc/DatamoshPlugin/UHT/DatamoshPlugin.init.gen.cpp"
 #include "C:/Users/schro/Documents/Unreal Projects/DatamoshTest/Plugins/DatamoshPlugin/Intermediate/Build/Win64/UnrealEditor/Inc/DatamoshPlugin/UHT/DatamoshSubsystem.gen.cpp"
 #include "C:/Users/schro/Documents/Unreal Projects/DatamoshTest/Plugins/DatamoshPlugin/Source/DatamoshSceneViewExtension/Private/DatamoshPlugin.cpp"
+#include "C:/Users/schro/Documents/Unreal Projects/DatamoshTest/Plugins/DatamoshPlugin/Source/DatamoshSceneViewExtension/Private/DatamoshSubsystem.cpp"

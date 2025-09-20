@@ -104,63 +104,95 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 	// Set the shader parameters
 	FDatamoshShader::FParameters* PassParameters = GraphBuilder.AllocParameters<FDatamoshShader::FParameters>();
 
-	FRDGTexture* PreviousFrameTextureRef{nullptr};
+	// Create / Get the Velocity Fluid Velocity Field
+	FRDGTexture* VelocityFluidRef{nullptr};
 
-	if (PreviousFramePooledTexture == nullptr or PreviousViewRect.Size() != SceneColor.ViewRect.Size())
+	if (VelocityFluidPooled == nullptr or PreviousViewRect.Size() != SceneColor.ViewRect.Size())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Creating First PreviousFramePoolTexture External Texture"));
-		PreviousFramePooledTexture = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
-		PreviousFrameTextureRef = GraphBuilder.RegisterExternalTexture(PreviousFramePooledTexture);
+		VelocityFluidPooled = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
+		VelocityFluidRef = GraphBuilder.RegisterExternalTexture(VelocityFluidPooled);
 
 		PreviousViewRect = SceneColor.ViewRect;
 	}
 	else
 	{
-		PreviousFrameTextureRef = GraphBuilder.RegisterExternalTexture(PreviousFramePooledTexture);
+		VelocityFluidRef = GraphBuilder.RegisterExternalTexture(VelocityFluidPooled);
 	}
 
+	// Setup all the descriptors to create a target texture
+	FRDGTextureDesc VelocityFluidOutputDesc;
+	{
+		VelocityFluidOutputDesc = VelocityFluidRef->Desc;
 
-	PassParameters->PreviousFrame = PreviousFrameTextureRef;
+		VelocityFluidOutputDesc.Reset();
+		VelocityFluidOutputDesc.Flags |= TexCreate_UAV;
+		VelocityFluidOutputDesc.Flags &= ~(TexCreate_RenderTargetable | TexCreate_FastVRAM);
+
+		FLinearColor ClearColor{0., 0., 0., 0.};
+		VelocityFluidOutputDesc.ClearValue = FClearValueBinding{ClearColor};
+	}
+
+	// Create target texture
+	FRDGTextureRef VelocityFluidOutputTexture = GraphBuilder.CreateTexture(
+		VelocityFluidOutputDesc,
+		TEXT("Velocity Fluid Texture")
+	);
+
 
 	// Input is the SceneColor from PostProcess Material Inputs
 	PassParameters->OriginalSceneColor = SceneColor.Texture;
 
+	// This frames velocity texture
 	PassParameters->Velocity = SceneVelocity.Texture;
+
+	// Fluid Velocity Field
+	PassParameters->VelocityFluid = VelocityFluidRef;
 
 	// Use ScreenPassTextureViewportParameters so we don't need to calculate these ourselves
 	PassParameters->SceneColorViewport = GetScreenPassTextureViewportParameters(SceneColorViewport);
 
+	// This frames velocity texture's viewport
 	PassParameters->SceneVelocityViewport = GetScreenPassTextureViewportParameters(SceneVelocityViewport);
 
-	const FIntPoint PassViewSize = SceneColor.ViewRect.Size();
 
 	// Create UAV from Target Texture
-	PassParameters->Output = GraphBuilder.CreateUAV(FRDGTextureUAVDesc(OutputTexture));
+	PassParameters->Output = GraphBuilder.CreateUAV(FRDGTextureUAVDesc{OutputTexture});
+
+	// Create UAV from Target Texture
+	PassParameters->VelocityFluidOutput = GraphBuilder.CreateUAV(FRDGTextureUAVDesc{VelocityFluidOutputTexture});
 
 
-	// Set Compute Shader and execute
-	const FIntVector GroupCount = FComputeShaderUtils::GetGroupCount(
-		PassViewSize,
-		FComputeShaderUtils::kGolden2DGroupSize
-	);
+	// Add Compute Pass
+
+	{
+		const FIntPoint PassViewSize = SceneColor.ViewRect.Size();
+
+		// Set Compute Shader and execute
+		const FIntVector GroupCount = FComputeShaderUtils::GetGroupCount(
+			PassViewSize,
+			FComputeShaderUtils::kGolden2DGroupSize
+		);
 
 
-	TShaderMapRef<FDatamoshShader> ComputeShader{GlobalShaderMap};
+		TShaderMapRef<FDatamoshShader> ComputeShader{GlobalShaderMap};
 
-	FComputeShaderUtils::AddPass(
-		GraphBuilder,
-		RDG_EVENT_NAME("Datamosh SceneViewExtension Post Processing CS Shader %dx%d", PassViewSize.X, PassViewSize.Y),
-		ComputeShader,
-		PassParameters,
-		GroupCount
-	);
+		FComputeShaderUtils::AddPass(
+			GraphBuilder,
+			RDG_EVENT_NAME("Datamosh SceneViewExtension Post Processing CS Shader %dx%d", PassViewSize.X,
+			               PassViewSize.Y),
+			ComputeShader,
+			PassParameters,
+			GroupCount
+		);
+	}
 
-	AddCopyTexturePass(GraphBuilder, OutputTexture, PreviousFrameTextureRef);
+	// Shift around textures
+	{
+		AddCopyTexturePass(GraphBuilder, OutputTexture, SceneColor.Texture);
+		AddCopyTexturePass(GraphBuilder, VelocityFluidOutputTexture, VelocityFluidRef);
+	}
 
-	// Copy the output texture back to SceneColor
-	// Returning the new texture as ScreenPassTexture doesn't work, so this is pretty fast alternative
-	// Also with f.ex 'PrePostProcessPass_RenderThread' you get only input and something similar needs to be implemented then
-	AddCopyTexturePass(GraphBuilder, OutputTexture, SceneColor.Texture);
 
 	return SceneColor;
 }

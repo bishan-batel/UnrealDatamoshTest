@@ -33,7 +33,7 @@ public:
 	);
 
 private:
-	TRefCountPtr<IPooledRenderTarget> PreviousFramePooledTexture, VelocityBuffer;
+	TRefCountPtr<IPooledRenderTarget> VelocityFluidPooled;
 	FIntRect PreviousViewRect;
 };
 
@@ -45,9 +45,10 @@ public:
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters,)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, OriginalSceneColor)
-		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, PreviousFrame)
+		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, VelocityFluid)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, Velocity)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, Output)
+		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, VelocityFluidOutput)
 		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, SceneColorViewport)
 		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, SceneVelocityViewport)
 	END_SHADER_PARAMETER_STRUCT()

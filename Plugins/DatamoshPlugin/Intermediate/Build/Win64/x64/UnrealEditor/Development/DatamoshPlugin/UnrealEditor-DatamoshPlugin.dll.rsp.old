@@ -38,6 +38,7 @@
 /NATVIS:"..\Intermediate\Build\Win64\x64\UnrealEditor\Development\RenderCore\RenderCore.natvis"
 "C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Intermediate\Build\Win64\x64\DatamoshTestEditor\Development\UnrealEd\SharedPCH.UnrealEd.Project.ValApi.Cpp20.h.obj"
 "C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshPlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshPlugin\Module.DatamoshPlugin.cpp.obj"
+"C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshPlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshPlugin\DatamoshSubsystem.cpp.obj"
 "C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshPlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshPlugin\FDatamoshSceneViewExtension.cpp.obj"
 "C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshPlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshPlugin\Default.rc2.res"
 "..\Intermediate\Build\Win64\x64\UnrealEditor\Development\Core\UnrealEditor-Core.lib"
