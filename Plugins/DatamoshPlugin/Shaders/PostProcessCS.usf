@@ -6,30 +6,42 @@
 #include "/Engine/Public/Platform.ush"
 #include "/Engine/Private/Common.ush"
 #include "/Engine/Private/ScreenPass.ush"
+#include "/Engine/Private/SceneCapturePixelShader.usf"
 
 // Shader parameters
+
 
 // SceneColor texture
 Texture2D OriginalSceneColor;
 Texture2D VelocityFluid;
 Texture2D PreviousFrame;
 Texture2D Velocity;
+Texture2D DatamoshCanvas;
+Texture2D CustomDepth;
 
+SamplerState DepthBufferSampler;
 
 // SceneColor Viewport parameters
 SCREEN_PASS_TEXTURE_VIEWPORT(SceneColorViewport)
 
 SCREEN_PASS_TEXTURE_VIEWPORT(SceneVelocityViewport)
 
+SCREEN_PASS_TEXTURE_VIEWPORT(CustomDepthViewport)
+
 // Outputs
 
 RWTexture2D<float4> Output;
 
+RWTexture2D<float4> DatamoshCanvasOutput;
+
 RWTexture2D<float4> VelocityFluidOutput;
+
 
 float4 GaussianSample(
 	const Texture2D Texture,
-	const float2 screen_size,
+	const float2 ScreenSize,
+	const float2 UvMin,
+	const float2 UvMax,
 	const float2 UvCenter
 )
 {
@@ -41,18 +53,18 @@ float4 GaussianSample(
 
 	const uint GaussianKernelSize = 9;
 
-	const float2 offset = float2(1., 1.) / screen_size;
+	const float2 Offset = float2(1., 1.) / ScreenSize;
 
-	const float2 offsets[9] = {
-		float2(-offset.x, offset.y), // top-left
-		float2(0.0f, offset.y), // top-center
-		float2(offset.x, offset.y), // top-right
-		float2(-offset.x, 0.0f), // center-left
+	const float2 Offsets[9] = {
+		float2(-Offset.x, Offset.y), // top-left
+		float2(0.0f, Offset.y), // top-center
+		float2(Offset.x, Offset.y), // top-right
+		float2(-Offset.x, 0.0f), // center-left
 		float2(0.0f, 0.0f), // center-center
-		float2(offset.x, 0.0f), // center-right
-		float2(-offset.x, -offset.y), // bottom-left
-		float2(0.0f, -offset.y), // bottom-center
-		float2(offset.x, -offset.y) // bottom-right
+		float2(Offset.x, 0.0f), // center-right
+		float2(-Offset.x, -Offset.y), // bottom-left
+		float2(0.0f, -Offset.y), // bottom-center
+		float2(Offset.x, -Offset.y) // bottom-right
 	};
 
 
@@ -60,12 +72,39 @@ float4 GaussianSample(
 
 	for (uint i = 0; i < GaussianKernelSize; i++)
 	{
-		float2 Uv = UvCenter + offsets[i] * Guassian_Kernel[i];
-		GuassianSample += Texture.SampleLevel(GlobalPointClampedSampler, Uv, 0);
+		float2 Uv = clamp(UvCenter + Offsets[i], UvMin, UvMax);
+		GuassianSample += Texture.SampleLevel(GlobalPointClampedSampler, Uv, 0) * Guassian_Kernel[i];
 	}
 
-	// return GuassianSample;
-	return Texture.SampleLevel(GlobalPointClampedSampler, UvCenter, 0);
+	return GuassianSample;
+}
+
+float4 BoxSample(
+	const Texture2D Texture,
+	const float2 ScreenSize,
+	const float2 UvMin,
+	const float2 UvMax,
+	const float2 UvCenter
+)
+{
+	const uint BoxKernelSize = 5;
+
+	const float2 Offset = float2(1., 1.) / ScreenSize;
+
+	float4 Sample = float4(0., 0., 0., 0.);
+
+	for (uint x = 0; x < BoxKernelSize; x++)
+	{
+		for (uint y = 0; y < BoxKernelSize; y++)
+		{
+			float2 Uv = clamp(UvCenter + float2(x, y) * Offset, UvMin, UvMax);
+			Sample += Texture.SampleLevel(GlobalPointClampedSampler, Uv, 0);
+		}
+	}
+
+	Sample /= float(BoxKernelSize * BoxKernelSize);
+
+	return Sample;
 }
 
 // Compute Shader code
@@ -78,6 +117,12 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		return;
 	}
 
+	const uint2 SceneWriteIndex = DispatchThreadId + SceneColorViewport_ViewportMin;
+
+	const float2 SceneColorCutoutViewportSize = float2(
+		(SceneColorViewport_ViewportMax - SceneColorViewport_ViewportMin)
+	);
+
 	// Calculate SampleUV with viewport parameters
 	const float2 SceneColorUV =
 		(float2(SceneColorViewport_ViewportMin) + (DispatchThreadId + 0.5)) * SceneColorViewport_ExtentInverse;
@@ -86,33 +131,83 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		SceneColorUV * (SceneVelocityViewport_UVViewportMax - SceneVelocityViewport_UVViewportMin) +
 		SceneVelocityViewport_ViewportMin;
 
-	float4 FragmentVelocity = GaussianSample(
-		Velocity,
-		float2(SceneVelocityViewport_ViewportMax - SceneVelocityViewport_ViewportMin),
-		VelocityUV
-	);
 
-	if (length2(FragmentVelocity) > 0.)
+	// const float2 DepthUV =
+	// 	SceneColorUV * (CustomDepthViewport_UVViewportMax - CustomDepthViewport_UVViewportMin) +
+	// 	CustomDepthViewport_ViewportMin;
+
+	const float4 FragmentVelocityEncoded = Velocity.SampleLevel(GlobalPointClampedSampler, VelocityUV, 0);
+	float3 FragmentVelocity = float3(0., 0., 0.);
+
+	if (length2(FragmentVelocityEncoded) > 0.)
 	{
-		FragmentVelocity.xy = DecodeVelocityFromTexture(FragmentVelocity).xy;
+		FragmentVelocity = DecodeVelocityFromTexture(FragmentVelocityEncoded);
 	}
 
-	// velocity = 4.008 * velocity - 0.5 * 4.008;
+	float2 FluidVelocityAtPoint = VelocityFluid.SampleLevel(
+		GlobalPointClampedSampler,
+		SceneColorUV,
+		0
+	).xy;
 
-	float4 OriginalVelocity = GaussianSample(
-		VelocityFluid,
-		float2(SceneColorViewport_ViewportMax - SceneColorViewport_ViewportMin),
-		VelocityUV - FragmentVelocity.xy * 0.1f
+	// FluidVelocityAtPoint = BoxSample(
+	// 	VelocityFluid,
+	// 	SceneColorCutoutViewportSize,
+	// 	SceneColorViewport_UVViewportMin,
+	// 	SceneColorViewport_UVViewportMax,
+	// 	SceneColorUV - FluidVelocityAtPoint
+	// ).xy;
+	FluidVelocityAtPoint = VelocityFluid.SampleLevel(
+		GlobalPointClampedSampler,
+		SceneColorUV - FluidVelocityAtPoint / SceneColorCutoutViewportSize,
+		0
+	).xy;
+
+
+	FluidVelocityAtPoint *= 0.999;
+	FluidVelocityAtPoint = FragmentVelocity.xy;
+
+	if (isnan(FluidVelocityAtPoint.x) || isnan(FluidVelocityAtPoint.y))
+	{
+		FluidVelocityAtPoint = float2(0., 0.);
+	}
+
+	// const float2 Offset = FluidVelocityAtPoint / SceneColorCutoutViewportSize;
+	const float2 Offset = FragmentVelocity.xy;
+	// const float2 Offset = -FluidVelocityAtPoint / SceneColorCutoutViewportSize * 5. * 5.;
+	// const float2 Offset = FluidVelocityAtPoint * 0.5;
+
+	const float4 OriginalColor = OriginalSceneColor.SampleLevel(
+		GlobalPointClampedSampler,
+		clamp(SceneColorUV, SceneColorViewport_UVViewportMin, SceneColorViewport_UVViewportMax),
+		0
 	);
 
-	OriginalVelocity = 0.999 * OriginalVelocity;
-	OriginalVelocity += FragmentVelocity;
+	const float4 CanvasFragment = DatamoshCanvas.SampleLevel(
+		GlobalPointClampedSampler,
+		clamp(SceneColorUV - Offset, SceneColorViewport_UVViewportMin, SceneColorViewport_UVViewportMax),
+		0
+	);
 
-	const float2 Offset = OriginalVelocity * 0.1f;
-	const float4 OriginalColor = OriginalSceneColor.SampleLevel(GlobalPointClampedSampler, SceneColorUV - Offset, 0);
+
+	const float2 SceneUVNormalized = (SceneColorUV - SceneColorViewport_UVViewportMin) / SceneColorCutoutViewportSize;
+
+	const float4 CanvasOutput = CanvasFragment;
+
+	// float4 SceneOutput = lerp(OriginalColor, CanvasOutput,
+	//                           clamp(distance(float2(0.5, 0.5), SceneUVNormalized) * 6., 0., 1.));
+	float4 SceneOutput = CanvasOutput;
+
+	DatamoshCanvasOutput[SceneWriteIndex] = SceneOutput;
+	Output[SceneWriteIndex] = SceneOutput;
+	// DatamoshCanvasOutput[IndexOffset] = SceneOutput;
+	// Output[IndexOffset] = SceneOutput;
 
 
-	Output[SceneColorViewport_ViewportMin + DispatchThreadId] = OriginalColor;
-	VelocityFluidOutput[SceneColorViewport_ViewportMin + DispatchThreadId] = OriginalVelocity;
-	// Output[SceneColorViewport_ViewportMin + DispatchThreadId] = OriginalVelocity;
+	VelocityFluidOutput[SceneWriteIndex] = float4(FluidVelocityAtPoint, 0, 1);
+	Output[SceneWriteIndex] = float4(CustomDepth.SampleLevel(
+		DepthBufferSampler,
+		SceneColorUV,
+		0
+	).r, 0., 0., 1.);
 }

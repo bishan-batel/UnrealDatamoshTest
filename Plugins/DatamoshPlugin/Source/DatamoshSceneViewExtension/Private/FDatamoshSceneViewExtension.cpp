@@ -73,6 +73,15 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		return SceneColor;
 	}
 
+	const FRDGTextureRef CustomDepthStencil{Inputs.CustomDepthTexture};
+
+	if (CustomDepthStencil == nullptr)
+	{
+		UE_LOG(LogTemp, Warning,
+		       TEXT("Datamosh effect will not work without a custom depth stencil, enable it in project settings"));
+		return SceneColor;
+	}
+
 	const FScreenPassTexture& SceneVelocity = FScreenPassTexture::CopyFromSlice(
 		GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::Velocity)
 	);
@@ -85,40 +94,47 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 	// Accesspoint to our Shaders
 	FGlobalShaderMap* GlobalShaderMap = GetGlobalShaderMap(ViewFamily.GetFeatureLevel());
 
-	// Setup all the descriptors to create a target texture
-	FRDGTextureDesc OutputDesc;
-	{
-		OutputDesc = SceneColor.Texture->Desc;
+	// Create / Get the Velocity Fluid Field & Datamosh Canvas
 
-		OutputDesc.Reset();
-		OutputDesc.Flags |= TexCreate_UAV;
-		OutputDesc.Flags &= ~(TexCreate_RenderTargetable | TexCreate_FastVRAM);
+	const bool DidViewportResize = PreviousViewRect.Size() != SceneColor.ViewRect.Size();
 
-		FLinearColor ClearColor{0., 0., 0., 0.};
-		OutputDesc.ClearValue = FClearValueBinding{ClearColor};
-	}
-
-	// Create target texture
-	FRDGTextureRef OutputTexture = GraphBuilder.CreateTexture(OutputDesc, TEXT("Custom Effect Output Texture"));
-
-	// Set the shader parameters
-	FDatamoshShader::FParameters* PassParameters = GraphBuilder.AllocParameters<FDatamoshShader::FParameters>();
-
-	// Create / Get the Velocity Fluid Velocity Field
-	FRDGTexture* VelocityFluidRef{nullptr};
-
-	if (VelocityFluidPooled == nullptr or PreviousViewRect.Size() != SceneColor.ViewRect.Size())
+	if (DidViewportResize or VelocityFluidPooled == nullptr or DatamoshCanvasPooled == nullptr)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Creating First PreviousFramePoolTexture External Texture"));
-		VelocityFluidPooled = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
-		VelocityFluidRef = GraphBuilder.RegisterExternalTexture(VelocityFluidPooled);
 
+		// Save new view rect to prevent creating the texture again in further frames
 		PreviousViewRect = SceneColor.ViewRect;
+
+		const FIntPoint TextureSize{
+			SceneColor.Texture->Desc.GetSize().X,
+			SceneColor.Texture->Desc.GetSize().Y,
+		};
+
+		FRDGTextureDesc VelocityFluidDesc = FRDGTextureDesc::Create2D(
+			TextureSize,
+			PF_FloatRGBA,
+			FClearValueBinding{FLinearColor{0., 0., 0.}},
+			ETextureCreateFlags::None
+		);
+
+		// Create VelocityFluid texture, make it external, and place it back into the graph to use it for this frame.
+		VelocityFluidPooled = GraphBuilder.ConvertToExternalTexture(
+			GraphBuilder.CreateTexture(VelocityFluidDesc, TEXT("Velocity Fluid"))
+		);
+
+
+		// Datamosh canvas has the same exact properties as SceneColor
+		DatamoshCanvasPooled = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
 	}
-	else
+
+	if (FMath::RandRange(0.f, 1.f) < 0.002f)
 	{
-		VelocityFluidRef = GraphBuilder.RegisterExternalTexture(VelocityFluidPooled);
+		DatamoshCanvasPooled = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
 	}
+
+	FRDGTexture* const VelocityFluidRef = GraphBuilder.RegisterExternalTexture(VelocityFluidPooled);
+
+	FRDGTexture* const DatamoshCanvasRef = GraphBuilder.RegisterExternalTexture(DatamoshCanvasPooled);
 
 	// Setup all the descriptors to create a target texture
 	FRDGTextureDesc VelocityFluidOutputDesc;
@@ -136,35 +152,62 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 	// Create target texture
 	FRDGTextureRef VelocityFluidOutputTexture = GraphBuilder.CreateTexture(
 		VelocityFluidOutputDesc,
-		TEXT("Velocity Fluid Texture")
+		TEXT("Velocity Fluid Field")
 	);
 
+	// Setup all the descriptors to create a target texture
+	FRDGTextureDesc OutputDesc;
+	{
+		OutputDesc = SceneColor.Texture->Desc;
 
-	// Input is the SceneColor from PostProcess Material Inputs
-	PassParameters->OriginalSceneColor = SceneColor.Texture;
+		OutputDesc.Reset();
+		OutputDesc.Flags |= TexCreate_UAV;
+		OutputDesc.Flags &= ~(TexCreate_RenderTargetable | TexCreate_FastVRAM);
 
-	// This frames velocity texture
-	PassParameters->Velocity = SceneVelocity.Texture;
+		FLinearColor ClearColor{0., 0., 0., 0.};
+		OutputDesc.ClearValue = FClearValueBinding{ClearColor};
+	}
 
-	// Fluid Velocity Field
-	PassParameters->VelocityFluid = VelocityFluidRef;
+	// Create target texture
+	FRDGTextureRef OutputTexture = GraphBuilder.CreateTexture(OutputDesc, TEXT("Final SceneColor Output"));
 
-	// Use ScreenPassTextureViewportParameters so we don't need to calculate these ourselves
-	PassParameters->SceneColorViewport = GetScreenPassTextureViewportParameters(SceneColorViewport);
+	FRDGTextureRef DatamoshCanvasOutput = GraphBuilder.CreateTexture(OutputDesc, TEXT("DatamoshCanvasOutput"));
 
-	// This frames velocity texture's viewport
-	PassParameters->SceneVelocityViewport = GetScreenPassTextureViewportParameters(SceneVelocityViewport);
+	// Set the shader parameters
+	FDatamoshShader::FParameters* PassParameters = GraphBuilder.AllocParameters<FDatamoshShader::FParameters>();
+	{
+		// Input is the SceneColor from PostProcess Material Inputs
+		PassParameters->OriginalSceneColor = SceneColor.Texture;
 
+		// This frames velocity texture
+		PassParameters->Velocity = SceneVelocity.Texture;
 
-	// Create UAV from Target Texture
-	PassParameters->Output = GraphBuilder.CreateUAV(FRDGTextureUAVDesc{OutputTexture});
+		// Fluid Velocity Field
+		PassParameters->VelocityFluid = VelocityFluidRef;
 
-	// Create UAV from Target Texture
-	PassParameters->VelocityFluidOutput = GraphBuilder.CreateUAV(FRDGTextureUAVDesc{VelocityFluidOutputTexture});
+		// Use ScreenPassTextureViewportParameters so we don't need to calculate these ourselves
+		PassParameters->SceneColorViewport = GetScreenPassTextureViewportParameters(SceneColorViewport);
+
+		// This frames velocity texture's viewport
+		PassParameters->SceneVelocityViewport = GetScreenPassTextureViewportParameters(SceneVelocityViewport);
+
+		PassParameters->DepthBuffer = CustomDepthStencil;
+
+		PassParameters->DepthBufferSampler = TStaticSamplerState<SF_Point>::CreateRHI();
+
+		PassParameters->DatamoshCanvas = DatamoshCanvasRef;
+
+		PassParameters->DatamoshCanvasOutput = GraphBuilder.CreateUAV(FRDGTextureUAVDesc{DatamoshCanvasOutput});
+
+		// Create UAV from Target Texture
+		PassParameters->Output = GraphBuilder.CreateUAV(FRDGTextureUAVDesc{OutputTexture});
+
+		// Create UAV from Target Texture
+		PassParameters->VelocityFluidOutput = GraphBuilder.CreateUAV(FRDGTextureUAVDesc{VelocityFluidOutputTexture});
+	}
 
 
 	// Add Compute Pass
-
 	{
 		const FIntPoint PassViewSize = SceneColor.ViewRect.Size();
 
@@ -191,6 +234,7 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 	{
 		AddCopyTexturePass(GraphBuilder, OutputTexture, SceneColor.Texture);
 		AddCopyTexturePass(GraphBuilder, VelocityFluidOutputTexture, VelocityFluidRef);
+		AddCopyTexturePass(GraphBuilder, DatamoshCanvasOutput, DatamoshCanvasRef);
 	}
 
 

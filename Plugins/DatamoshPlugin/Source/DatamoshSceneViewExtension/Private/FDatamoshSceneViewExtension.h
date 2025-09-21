@@ -33,7 +33,7 @@ public:
 	);
 
 private:
-	TRefCountPtr<IPooledRenderTarget> VelocityFluidPooled;
+	TRefCountPtr<IPooledRenderTarget> VelocityFluidPooled, DatamoshCanvasPooled;
 	FIntRect PreviousViewRect;
 };
 
@@ -45,12 +45,17 @@ public:
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters,)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, OriginalSceneColor)
+		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, DatamoshCanvas)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, VelocityFluid)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, Velocity)
+		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, DepthBuffer)
+		SHADER_PARAMETER_SAMPLER(SamplerState, DepthBufferSampler)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, Output)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, VelocityFluidOutput)
+		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, DatamoshCanvasOutput)
 		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, SceneColorViewport)
 		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, SceneVelocityViewport)
+		// SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, DepthBufferViewport)
 	END_SHADER_PARAMETER_STRUCT()
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters);
