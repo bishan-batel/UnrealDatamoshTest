@@ -48,6 +48,7 @@ public:
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, VelocityFluid)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, Velocity)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, CustomDepth)
+		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<uint2>, CustomStencil)
 		SHADER_PARAMETER_SAMPLER(SamplerState, DepthBufferSampler)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, Output)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, VelocityFluidOutput)

@@ -1,5 +1,6 @@
 #include "FDatamoshSceneViewExtension.h"
 
+#include "MeshPassProcessor.h"
 #include "PixelShaderUtils.h"
 #include "SceneTextures.h"
 #include "SWarningOrErrorBox.h"
@@ -69,6 +70,7 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::SceneColor)
 	);
 
+	Inputs.SceneTextures.SceneTextures;
 	if (!SceneColor.IsValid() or CVarShaderOn.GetValueOnRenderThread())
 	{
 		return SceneColor;
@@ -194,6 +196,7 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		PassParameters->SceneVelocityViewport = GetScreenPassTextureViewportParameters(SceneVelocityViewport);
 
 		PassParameters->CustomDepth = CustomDepthStencil;
+		PassParameters->CustomStencil = GraphBuilder.CreateSRV(CustomDepthStencil);
 
 		PassParameters->CustomDepthStencilViewport = GetScreenPassTextureViewportParameters(CustomDepthStencilViewport);
 

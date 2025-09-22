@@ -18,6 +18,7 @@ Texture2D PreviousFrame;
 Texture2D Velocity;
 Texture2D DatamoshCanvas;
 Texture2D CustomDepth;
+Texture2D<uint2> CustomStencil;
 
 SamplerState DepthBufferSampler;
 
@@ -197,12 +198,12 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	// 	SceneColorUV * (CustomDepthStencilViewport_UVViewportMax - CustomDepthStencilViewport_UVViewportMin) +
 	// 	CustomDepthStencilViewport_UVViewportMin;
 
-	CustomDepthStencilUV = float2(SceneColorUV) * SceneColorViewport_UVViewportSizeInverse;
+	CustomDepthStencilUV = float2(SceneColorUV);
 	// CustomDepthStencilUV -= SceneColorViewport_UVViewportMin;
 	// CustomDepthStencilUV *= SceneColorViewport_ViewportSizeInverse;
 	// CustomDepthStencilUV *= CustomDepthStencilViewport_UVViewportSize;
 	// CustomDepthStencilUV += CustomDepthStencilViewport_UVViewportMin;
-	// CustomDepthStencilUV *= CustomDepthStencilViewport_ViewportSize * SceneColorViewport_ViewportSizeInverse;
+	// CustomDepthStencilUV /= CustomDepthStencilViewport_ViewportSize * SceneColorViewport_ViewportSizeInverse;
 	// CustomDepthStencilUV *= float2(1., 0.785);
 
 	// const float4 DepthStencil = CustomDepth.SampleLevel(
@@ -221,7 +222,10 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		      0)
 	);
 
-	const uint Stencil = asuint(DepthStencil.y) & 0xF;
+	// const uint2 Stencil = CustomStencil.Load(uint3(
+	// 	float2(CustomDepthStencilUV) * CustomDepthStencilViewport_Extent, 0
+	// ));
+	const uint2 Stencil = CustomStencil.SampleLevel(DepthBufferSampler, CustomDepthStencilUV, 0);
 
 
 	const float4 CanvasOutput = CanvasFragment;
@@ -230,7 +234,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	//                           clamp(distance(float2(0.5, 0.5), SceneUVNormalized) * 6., 0., 1.));
 	float4 SceneOutput = OriginalColor;
 
-	if (abs(DepthStencil.x) > 0.f)
+	if ((Stencil.r) != 0)
 	{
 		SceneOutput = CanvasOutput;
 		SceneOutput = float4(1., 0., 1., 1.);
