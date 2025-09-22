@@ -144,21 +144,26 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		0
 	).xy;
 
-	FluidVelocityAtPoint = GaussianSample(
-		VelocityFluid,
-		SceneColorCutoutViewportSize,
-		SceneColorViewport_UVViewportMin,
-		SceneColorViewport_UVViewportMax,
-		SceneColorUV - FluidVelocityAtPoint
+	const float2 VelocityFluidUVOffset =
+		clamp(SceneColorUV - FluidVelocityAtPoint / SceneColorCutoutViewportSize, SceneColorViewport_UVViewportMin,
+		      SceneColorViewport_UVViewportMax);
+
+	FluidVelocityAtPoint = VelocityFluid.SampleLevel(
+		GlobalPointClampedSampler,
+		VelocityFluidUVOffset,
+		0
 	).xy;
-	// FluidVelocityAtPoint = VelocityFluid.SampleLevel(
-	// 	GlobalPointClampedSampler,
-	// 	SceneColorUV - FluidVelocityAtPoint / SceneColorCutoutViewportSize,
-	// 	0
+
+	// FluidVelocityAtPoint = GaussianSample(
+	// 	VelocityFluid,
+	// 	SceneColorCutoutViewportSize,
+	// 	SceneColorViewport_UVViewportMin,
+	// 	SceneColorViewport_UVViewportMax,
+	// 	VelocityFluidUVOffset
 	// ).xy;
 
 
-	FluidVelocityAtPoint *= 0.95;
+	FluidVelocityAtPoint *= 0.8;
 	FluidVelocityAtPoint += FragmentVelocity.xy;
 
 	if (isnan(FluidVelocityAtPoint.x) || isnan(FluidVelocityAtPoint.y))
@@ -166,10 +171,11 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		FluidVelocityAtPoint = float2(0., 0.);
 	}
 
-	const float2 Offset = -FluidVelocityAtPoint / SceneColorCutoutViewportSize;
-	// const float2 Offset = FragmentVelocity.xy;
 	// const float2 Offset = -FluidVelocityAtPoint / SceneColorCutoutViewportSize * 5. * 5.;
-	// const float2 Offset = -FluidVelocityAtPoint;
+	// const float2 Offset = -lerp(FragmentVelocity.xy, FluidVelocityAtPoint, 0.01);
+	// const float2 Offset = -FragmentVelocity.xy;
+	const float2 Offset = -FluidVelocityAtPoint.xy;
+
 
 	const float4 OriginalColor = OriginalSceneColor.SampleLevel(
 		GlobalPointClampedSampler,
@@ -194,15 +200,18 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 
 	float2 CustomDepthStencilUV;
 
-	// const float2 CustomDepthStencilUV =
-	// 	SceneColorUV * (CustomDepthStencilViewport_UVViewportMax - CustomDepthStencilViewport_UVViewportMin) +
-	// 	CustomDepthStencilViewport_UVViewportMin;
+	CustomDepthStencilUV =
+		SceneColorUV * (CustomDepthStencilViewport_UVViewportMax - CustomDepthStencilViewport_UVViewportMin) +
+		CustomDepthStencilViewport_UVViewportMin;
 
-	CustomDepthStencilUV = float2(SceneColorUV);
-	// CustomDepthStencilUV -= SceneColorViewport_UVViewportMin;
-	// CustomDepthStencilUV *= SceneColorViewport_ViewportSizeInverse;
-	// CustomDepthStencilUV *= CustomDepthStencilViewport_UVViewportSize;
-	// CustomDepthStencilUV += CustomDepthStencilViewport_UVViewportMin;
+	// CustomDepthStencilUV = float2(SceneColorUV);
+
+	bool swap = any(CustomDepthStencilViewport_ViewportSize < SceneColorViewport_ViewportSize);
+	if (swap)
+	{
+		// CustomDepthStencilUV /= abs(SceneColorCutoutViewportSize - CustomDepthStencilViewport_ViewportSize);
+	}
+	// CustomDepthStencilUV /= max(float2(CustomDepthStencilViewport_ViewportSize), SceneColorViewport_ViewportSize);
 	// CustomDepthStencilUV /= CustomDepthStencilViewport_ViewportSize * SceneColorViewport_ViewportSizeInverse;
 	// CustomDepthStencilUV *= float2(1., 0.785);
 
@@ -222,10 +231,10 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		      0)
 	);
 
-	// const uint2 Stencil = CustomStencil.Load(uint3(
-	// 	float2(CustomDepthStencilUV) * CustomDepthStencilViewport_Extent, 0
-	// ));
-	const uint2 Stencil = CustomStencil.SampleLevel(DepthBufferSampler, CustomDepthStencilUV, 0);
+	const uint2 Stencil = CustomStencil.Load(uint3(
+		float2(CustomDepthStencilUV) * CustomDepthStencilViewport_Extent, 0
+	));
+	// const uint2 Stencil = CustomStencil.SampleLevel(DepthBufferSampler, CustomDepthStencilUV, 0);
 
 
 	const float4 CanvasOutput = CanvasFragment;
@@ -237,7 +246,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	if ((Stencil.r) != 0)
 	{
 		SceneOutput = CanvasOutput;
-		SceneOutput = float4(1., 0., 1., 1.);
+		// SceneOutput = float4(swap ? 0. : 1., 0., 1., 1.);
 	}
 
 	if (any(CustomDepthStencilUV > CustomDepthStencilViewport_UVViewportMax) || any(

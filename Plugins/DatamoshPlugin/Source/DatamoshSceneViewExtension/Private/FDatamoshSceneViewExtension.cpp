@@ -70,7 +70,6 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::SceneColor)
 	);
 
-	Inputs.SceneTextures.SceneTextures;
 	if (!SceneColor.IsValid() or CVarShaderOn.GetValueOnRenderThread())
 	{
 		return SceneColor;
