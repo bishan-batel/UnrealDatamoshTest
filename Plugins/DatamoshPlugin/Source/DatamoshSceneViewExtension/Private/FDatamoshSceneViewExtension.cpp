@@ -1,5 +1,6 @@
 #include "FDatamoshSceneViewExtension.h"
 
+#include "PixelShaderUtils.h"
 #include "SceneTextures.h"
 #include "SWarningOrErrorBox.h"
 #include "Framework/Notifications/NotificationManager.h"
@@ -88,6 +89,7 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 
 	const FScreenPassTextureViewport SceneColorViewport{SceneColor};
 	const FScreenPassTextureViewport SceneVelocityViewport{SceneVelocity};
+	const FScreenPassTextureViewport CustomDepthStencilViewport{CustomDepthStencil};
 
 	RDG_EVENT_SCOPE(GraphBuilder, "Custom post process effect");
 
@@ -127,10 +129,10 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		DatamoshCanvasPooled = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
 	}
 
-	if (FMath::RandRange(0.f, 1.f) < 0.002f)
-	{
-		DatamoshCanvasPooled = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
-	}
+	// if (FMath::RandRange(0.f, 1.f) < 0.002f)
+	// {
+	// 	DatamoshCanvasPooled = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
+	// }
 
 	FRDGTexture* const VelocityFluidRef = GraphBuilder.RegisterExternalTexture(VelocityFluidPooled);
 
@@ -191,7 +193,9 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		// This frames velocity texture's viewport
 		PassParameters->SceneVelocityViewport = GetScreenPassTextureViewportParameters(SceneVelocityViewport);
 
-		PassParameters->DepthBuffer = CustomDepthStencil;
+		PassParameters->CustomDepth = CustomDepthStencil;
+
+		PassParameters->CustomDepthStencilViewport = GetScreenPassTextureViewportParameters(CustomDepthStencilViewport);
 
 		PassParameters->DepthBufferSampler = TStaticSamplerState<SF_Point>::CreateRHI();
 
@@ -219,6 +223,7 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 
 
 		TShaderMapRef<FDatamoshShader> ComputeShader{GlobalShaderMap};
+		ClearUnusedGraphResources(ComputeShader, PassParameters);
 
 		FComputeShaderUtils::AddPass(
 			GraphBuilder,

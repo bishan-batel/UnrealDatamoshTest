@@ -42,20 +42,19 @@ class DATAMOSHPLUGIN_API FDatamoshShader : public FGlobalShader
 public:
 	DECLARE_GLOBAL_SHADER(FDatamoshShader)
 	SHADER_USE_PARAMETER_STRUCT(FDatamoshShader, FGlobalShader);
-
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters,)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, OriginalSceneColor)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, DatamoshCanvas)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, VelocityFluid)
 		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, Velocity)
-		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, DepthBuffer)
+		SHADER_PARAMETER_RDG_TEXTURE(Texture2D, CustomDepth)
 		SHADER_PARAMETER_SAMPLER(SamplerState, DepthBufferSampler)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, Output)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, VelocityFluidOutput)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, DatamoshCanvasOutput)
 		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, SceneColorViewport)
 		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, SceneVelocityViewport)
-		// SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, DepthBufferViewport)
+		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, CustomDepthStencilViewport)
 	END_SHADER_PARAMETER_STRUCT()
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters);
