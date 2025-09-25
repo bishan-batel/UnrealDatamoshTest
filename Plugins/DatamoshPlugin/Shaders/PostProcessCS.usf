@@ -163,18 +163,22 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	).xy;
 
 
-	FluidVelocityAtPoint *= 0.8;
-	FluidVelocityAtPoint += FragmentVelocity.xy * min(1., -exp(-length2(FluidVelocityAtPoint) - 2.));
+	FluidVelocityAtPoint *= 0.99;
+	FluidVelocityAtPoint += FragmentVelocity.xy;
+
+	// FluidVelocityAtPoint = normalize(FluidVelocityAtPoint) * min(length(FluidVelocityAtPoint), 1.f);
+	FluidVelocityAtPoint += min((length(FluidVelocityAtPoint)), 0.1) *
+		normalize(float2(FluidVelocityAtPoint.y, -FluidVelocityAtPoint.x));
 
 	if (isnan(FluidVelocityAtPoint.x) || isnan(FluidVelocityAtPoint.y))
 	{
 		FluidVelocityAtPoint = float2(0., 0.);
 	}
 
-	// const float2 Offset = -FluidVelocityAtPoint / SceneColorCutoutViewportSize * 5. * 5.;
+	const float2 Offset = FluidVelocityAtPoint / SceneColorCutoutViewportSize * 5. * 5.;
 	// const float2 Offset = -lerp(FragmentVelocity.xy, FluidVelocityAtPoint, 0.01);
-	// const float2 Offset = -FragmentVelocity.xy;
-	const float2 Offset = -FluidVelocityAtPoint.xy;
+	// const float2 Offset = FragmentVelocity.xy;
+	// const float2 Offset = FluidVelocityAtPoint.xy;
 
 
 	const float4 OriginalColor = OriginalSceneColor.SampleLevel(
@@ -191,7 +195,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		0
 	);
 
-	// const float2 CustomDepthStencilUV =
+	// const float2 CustomrepthStencilUV =
 	// 	(SceneColorUV - SceneColorViewport_UVViewportMin) / (SceneColorViewport_UVViewportMax -
 	// 		SceneColorViewport_UVViewportMin) * (CustomDepthStencilViewport_UVViewportMax -
 	// 		CustomDepthStencilViewport_UVViewportMin) +

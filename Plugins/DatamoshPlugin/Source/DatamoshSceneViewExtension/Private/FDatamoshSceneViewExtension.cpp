@@ -6,6 +6,8 @@
 #include "SWarningOrErrorBox.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "PostProcess/PostProcessMaterialInputs.h"
+#include "Runtime/Renderer/Private/SceneRendering.h"
+#include "ScreenPass.h"
 
 
 IMPLEMENT_GLOBAL_SHADER(FDatamoshShader, "/Plugins/DatamoshPlugin/PostProcessCS.usf", "MainCS", SF_Compute);
@@ -64,7 +66,13 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 	const FSceneView& View,
 	const FPostProcessMaterialInputs& Inputs)
 {
+	Inputs.Validate();
+
+	const FIntRect Viewport = static_cast<const FViewInfo&>(View).ViewRect;
+
 	const FSceneViewFamily& ViewFamily = *View.Family;
+
+	Inputs.SceneTextures
 
 	const FScreenPassTexture& SceneColor = FScreenPassTexture::CopyFromSlice(
 		GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::SceneColor)
