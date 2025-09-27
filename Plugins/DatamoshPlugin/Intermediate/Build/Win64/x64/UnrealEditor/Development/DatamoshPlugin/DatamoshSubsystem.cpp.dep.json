@@ -6,7 +6,7 @@
         "PCH": "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\intermediate\\build\\win64\\x64\\datamoshtesteditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.cpp20.h.pch",
         "Includes": [
             "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\datamoshplugin\\definitions.datamoshplugin.h",
-            "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\source\\datamoshsceneviewextension\\private\\datamoshsubsystem.h",
+            "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\source\\datamoshsceneviewextension\\public\\datamoshsubsystem.h",
             "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\intermediate\\build\\win64\\unrealeditor\\inc\\datamoshplugin\\uht\\datamoshsubsystem.generated.h",
             "c:\\users\\schro\\documents\\unreal projects\\datamoshtest\\plugins\\datamoshplugin\\source\\datamoshsceneviewextension\\private\\fdatamoshsceneviewextension.h",
             "c:\\program files\\epic games\\ue_5.4\\engine\\source\\runtime\\rendercore\\public\\rendergraphutils.h",

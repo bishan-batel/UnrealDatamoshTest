@@ -1,16 +1,15 @@
 #include "FDatamoshSceneViewExtension.h"
 
-#include "MeshPassProcessor.h"
 #include "PixelShaderUtils.h"
-#include "SceneTextures.h"
-#include "SWarningOrErrorBox.h"
-#include "Framework/Notifications/NotificationManager.h"
 #include "PostProcess/PostProcessMaterialInputs.h"
 #include "Runtime/Renderer/Private/SceneRendering.h"
 #include "ScreenPass.h"
+#include "SceneTexturesConfig.h"
+#include "Runtime/Renderer/Private/SceneTextureParameters.h"
 
 
-IMPLEMENT_GLOBAL_SHADER(FDatamoshShader, "/Plugins/DatamoshPlugin/PostProcessCS.usf", "MainCS", SF_Compute);
+// IMPLEMENT_GLOBAL_SHADER(FDatamoshShader, "/Plugins/DatamoshPlugin/PostProcessCS.usf", "MainCS", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FDatamoshShader, "/Plugins/DatamoshPlugin/DatamoshCS.usf", "MainCS", SF_Compute);
 
 namespace
 {
@@ -36,7 +35,7 @@ void FDatamoshSceneViewExtension::SetupViewFamily(FSceneViewFamily& InViewFamily
 
 void FDatamoshSceneViewExtension::SetupView(FSceneViewFamily& InViewFamily, FSceneView& InView)
 {
-	InView.bCameraMotionBlur = TOptional<bool>{true};
+	InView.bCameraMotionBlur = true;
 }
 
 void FDatamoshSceneViewExtension::BeginRenderViewFamily(FSceneViewFamily& InViewFamily)
@@ -53,6 +52,7 @@ void FDatamoshSceneViewExtension::SubscribeToPostProcessingPass(
 	{
 		return;
 	}
+
 	if (Pass == EPostProcessingPass::MotionBlur)
 	{
 		InOutPassCallbacks.Add(
@@ -68,37 +68,54 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 {
 	Inputs.Validate();
 
-	const FIntRect Viewport = static_cast<const FViewInfo&>(View).ViewRect;
+	checkSlow(View.bIsViewInfo);
+	const FViewInfo& ViewInfo = static_cast<const FViewInfo&>(View);
+	const FIntRect ViewRect = ViewInfo.ViewRect;
 
 	const FSceneViewFamily& ViewFamily = *View.Family;
 
-	Inputs.SceneTextures
+	const FScreenPassTexture& SceneColor{
+		FScreenPassTexture::CopyFromSlice(
+			GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::SceneColor)
+		)
+	};
 
-	const FScreenPassTexture& SceneColor = FScreenPassTexture::CopyFromSlice(
-		GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::SceneColor)
-	);
 
 	if (!SceneColor.IsValid() or CVarShaderOn.GetValueOnRenderThread())
 	{
 		return SceneColor;
 	}
 
-	const FRDGTextureRef CustomDepthStencil{Inputs.CustomDepthTexture};
+	const FSceneTextures& SceneTextures = ViewInfo.GetSceneTextures();
 
-	if (CustomDepthStencil == nullptr)
+	FScreenPassTexture SceneDepth{SceneTextures.Depth.Target, ViewRect};
+
+
+	if (Inputs.CustomDepthTexture == nullptr)
 	{
 		UE_LOG(LogTemp, Warning,
 		       TEXT("Datamosh effect will not work without a custom depth stencil, enable it in project settings"));
 		return SceneColor;
 	}
 
-	const FScreenPassTexture& SceneVelocity = FScreenPassTexture::CopyFromSlice(
-		GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::Velocity)
-	);
+	FScreenPassTexture CustomDepthStencil{Inputs.CustomDepthTexture, ViewRect};
+
+	if (Inputs.CustomDepthTexture->IsCulled())
+	{
+		PreviousViewRect = {};
+		return SceneColor;
+	}
+
+
+	const auto SceneVelocity = FScreenPassTexture{SceneTextures.Velocity, ViewRect};
+	// const FScreenPassTexture& SceneVelocity = FScreenPassTexture::CopyFromSlice(
+	// 	GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::Velocity)
+	// );
 
 	const FScreenPassTextureViewport SceneColorViewport{SceneColor};
 	const FScreenPassTextureViewport SceneVelocityViewport{SceneVelocity};
 	const FScreenPassTextureViewport CustomDepthStencilViewport{CustomDepthStencil};
+	const FScreenPassTextureViewport SceneDepthViewport{SceneDepth};
 
 	RDG_EVENT_SCOPE(GraphBuilder, "Custom post process effect");
 
@@ -202,8 +219,10 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		// This frames velocity texture's viewport
 		PassParameters->SceneVelocityViewport = GetScreenPassTextureViewportParameters(SceneVelocityViewport);
 
-		PassParameters->CustomDepth = CustomDepthStencil;
-		PassParameters->CustomStencil = GraphBuilder.CreateSRV(CustomDepthStencil);
+		PassParameters->SceneDepthViewport = GetScreenPassTextureViewportParameters(SceneDepthViewport);
+
+		PassParameters->CustomDepth = CustomDepthStencil.Texture;
+		PassParameters->CustomStencil = GraphBuilder.CreateSRV(CustomDepthStencil.Texture);
 
 		PassParameters->CustomDepthStencilViewport = GetScreenPassTextureViewportParameters(CustomDepthStencilViewport);
 
@@ -218,6 +237,8 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 
 		// Create UAV from Target Texture
 		PassParameters->VelocityFluidOutput = GraphBuilder.CreateUAV(FRDGTextureUAVDesc{VelocityFluidOutputTexture});
+
+		PassParameters->SceneDepth = SceneDepth.Texture;
 	}
 
 

@@ -18,6 +18,7 @@ Texture2D PreviousFrame;
 Texture2D Velocity;
 Texture2D DatamoshCanvas;
 Texture2D CustomDepth;
+Texture2D SceneDepth;
 Texture2D<uint2> CustomStencil;
 
 SamplerState DepthBufferSampler;
@@ -27,6 +28,7 @@ SCREEN_PASS_TEXTURE_VIEWPORT(SceneColorViewport)
 
 SCREEN_PASS_TEXTURE_VIEWPORT(SceneVelocityViewport)
 SCREEN_PASS_TEXTURE_VIEWPORT(CustomDepthStencilViewport)
+SCREEN_PASS_TEXTURE_VIEWPORT(SceneDepthViewport)
 
 // Outputs
 
@@ -163,22 +165,22 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	).xy;
 
 
-	FluidVelocityAtPoint *= 0.99;
-	FluidVelocityAtPoint += FragmentVelocity.xy;
+	// FluidVelocityAtPoint *= 0.94;
+	FluidVelocityAtPoint = FragmentVelocity.xy;
 
 	// FluidVelocityAtPoint = normalize(FluidVelocityAtPoint) * min(length(FluidVelocityAtPoint), 1.f);
-	FluidVelocityAtPoint += min((length(FluidVelocityAtPoint)), 0.1) *
-		normalize(float2(FluidVelocityAtPoint.y, -FluidVelocityAtPoint.x));
+	// FluidVelocityAtPoint += min((length(FluidVelocityAtPoint)), 0.1) *
+	// 	normalize(float2(FluidVelocityAtPoint.y, -FluidVelocityAtPoint.x));
 
 	if (isnan(FluidVelocityAtPoint.x) || isnan(FluidVelocityAtPoint.y))
 	{
 		FluidVelocityAtPoint = float2(0., 0.);
 	}
 
-	const float2 Offset = FluidVelocityAtPoint / SceneColorCutoutViewportSize * 5. * 5.;
+	// const float2 Offset = FluidVelocityAtPoint / SceneColorCutoutViewportSize * 5. * 5.;
 	// const float2 Offset = -lerp(FragmentVelocity.xy, FluidVelocityAtPoint, 0.01);
 	// const float2 Offset = FragmentVelocity.xy;
-	// const float2 Offset = FluidVelocityAtPoint.xy;
+	const float2 Offset = FluidVelocityAtPoint.xy;
 
 
 	const float4 OriginalColor = OriginalSceneColor.SampleLevel(
@@ -195,64 +197,38 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		0
 	);
 
-	// const float2 CustomrepthStencilUV =
-	// 	(SceneColorUV - SceneColorViewport_UVViewportMin) / (SceneColorViewport_UVViewportMax -
-	// 		SceneColorViewport_UVViewportMin) * (CustomDepthStencilViewport_UVViewportMax -
-	// 		CustomDepthStencilViewport_UVViewportMin) +
-	// 	CustomDepthStencilViewport_UVViewportMin;
-
-
-	float2 CustomDepthStencilUV;
-
-	CustomDepthStencilUV =
-		SceneColorUV * (CustomDepthStencilViewport_UVViewportMax - CustomDepthStencilViewport_UVViewportMin) +
+	float2 CustomDepthStencilUV = SceneColorUV * (CustomDepthStencilViewport_UVViewportMax -
+			CustomDepthStencilViewport_UVViewportMin) +
 		CustomDepthStencilViewport_UVViewportMin;
 
-	// CustomDepthStencilUV = float2(SceneColorUV);
-
-	bool swap = any(CustomDepthStencilViewport_ViewportSize < SceneColorViewport_ViewportSize);
-	if (swap)
-	{
-		// CustomDepthStencilUV /= abs(SceneColorCutoutViewportSize - CustomDepthStencilViewport_ViewportSize);
-	}
-	// CustomDepthStencilUV /= max(float2(CustomDepthStencilViewport_ViewportSize), SceneColorViewport_ViewportSize);
-	// CustomDepthStencilUV /= CustomDepthStencilViewport_ViewportSize * SceneColorViewport_ViewportSizeInverse;
-	// CustomDepthStencilUV *= float2(1., 0.785);
-
-	// const float4 DepthStencil = CustomDepth.SampleLevel(
-	// 	DepthBufferSampler,
-	// 	CustomDepthStencilUV,
-	// 	0
-	// );
-	// const float4 DepthStencil = CustomDepth.Load(
-	// 	uint3(
-	// 		(SceneColorUV) / (SceneColorViewport_UVViewportMax - SceneColorViewport_UVViewportMin) *
-	// 		float2(CustomDepthStencilViewport_ViewportMax - CustomDepthStencilViewport_ViewportMin) +
-	// 		CustomDepthStencilViewport_ViewportMin, 0)
-	// );
 	const float4 DepthStencil = CustomDepth.Load(
-		uint3(float2(CustomDepthStencilUV) * CustomDepthStencilViewport_Extent,
-		      0)
+		uint3(float2(CustomDepthStencilUV) * CustomDepthStencilViewport_Extent, 0)
 	);
+
+	const float SampledSceneDepth = SceneDepth.Load(
+		uint3(float2(CustomDepthStencilUV) * SceneDepthViewport_Extent, 0)
+	).x;
 
 	const uint2 Stencil = CustomStencil.Load(uint3(
 		float2(CustomDepthStencilUV) * CustomDepthStencilViewport_Extent, 0
 	));
-	// const uint2 Stencil = CustomStencil.SampleLevel(DepthBufferSampler, CustomDepthStencilUV, 0);
-
 
 	const float4 CanvasOutput = CanvasFragment;
 
-	// float4 SceneOutput = lerp(OriginalColor, CanvasOutput,
-	//                           clamp(distance(float2(0.5, 0.5), SceneUVNormalized) * 6., 0., 1.));
 	float4 SceneOutput = OriginalColor;
 
-	// if ((Stencil.r) != 0)
-	if (DepthStencil.r > 0)
+	SceneOutput = float4(0., 0., 0., 1.);
+
+	if (DepthStencil.r > SampledSceneDepth)
 	{
-		SceneOutput = CanvasOutput;
-		// SceneOutput = float4(swap ? 0. : 1., 0., 1., 1.);
+		SceneOutput.r = 1.f;
 	}
+	else
+	{
+		SceneOutput.r = 0.f;
+	}
+
+	// SceneOutput = float4(abs(DepthStencil.r - SampledSceneDepth), 0., 0., 1.);
 
 	if (any(CustomDepthStencilUV > CustomDepthStencilViewport_UVViewportMax) || any(
 		CustomDepthStencilUV < CustomDepthStencilViewport_UVViewportMin))
@@ -263,6 +239,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	// SceneOutput.rg = length(CustomDepthStencilUV);
 	// SceneOutput.b = DepthStencil.r;
 	// SceneOutput.r = round(length(FragmentVelocity) * 100.) / 50.;
+
 
 	DatamoshCanvasOutput[SceneWriteIndex] = SceneOutput;
 	Output[SceneWriteIndex] = SceneOutput;

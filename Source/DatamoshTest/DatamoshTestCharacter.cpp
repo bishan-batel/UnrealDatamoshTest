@@ -20,7 +20,7 @@ ADatamoshTestCharacter::ADatamoshTestCharacter()
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
-		
+
 	// Don't rotate when the controller rotates. Let that just affect the camera.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -47,7 +47,8 @@ ADatamoshTestCharacter::ADatamoshTestCharacter()
 
 	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	// Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
@@ -60,6 +61,53 @@ void ADatamoshTestCharacter::BeginPlay()
 	Super::BeginPlay();
 }
 
+void ADatamoshTestCharacter::RagdollAndDatamosh()
+{
+	IsMoshing = not IsMoshing;
+
+	// GetWorldTimerManager().ClearTimer(DatamoshHandle);
+
+	// GetMesh()->ResetAllBodiesSimulatePhysics();
+	GetMesh()->SetAllBodiesSimulatePhysics(IsMoshing);
+	GetMesh()->SetSimulatePhysics(IsMoshing);
+	GetMesh()->SetRenderCustomDepth(IsMoshing);
+
+	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	{
+		if (IsMoshing)
+		{
+			GetCharacterMovement()->DisableMovement();
+			// DisableInput(PlayerController);
+		}
+		else
+		{
+			GetCharacterMovement()->MovementMode = MOVE_Walking;
+
+			{
+				FAttachmentTransformRules AttachmentTransformRules{FAttachmentTransformRules::KeepRelativeTransform};
+				AttachmentTransformRules.bWeldSimulatedBodies = true;
+				CameraBoom->AttachToComponent(GetCapsuleComponent(), AttachmentTransformRules);
+			}
+
+			const FTransform Transform = GetCapsuleComponent()->GetComponentTransform();
+
+			FVector3d Location = Transform.GetLocation();
+			FRotator Rotation{Transform.GetRotation()};
+
+			Location.Z -= 97.;
+			Rotation.Yaw -= 90;
+
+
+			GetMesh()->SetWorldLocationAndRotation(Location, Rotation);
+
+			GetMesh()->AttachToComponent( //
+				GetCapsuleComponent(),
+				FAttachmentTransformRules{EAttachmentRule::KeepWorld, true}
+			);
+		}
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Input
 
@@ -68,15 +116,16 @@ void ADatamoshTestCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	// Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<
+			UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
-	
+
 	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
 		// Jumping
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
@@ -86,10 +135,15 @@ void ADatamoshTestCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ADatamoshTestCharacter::Look);
+		EnhancedInputComponent->BindAction(ToggleDatamosh, ETriggerEvent::Started, this,
+		                                   &ADatamoshTestCharacter::RagdollAndDatamosh);
 	}
 	else
 	{
-		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+		UE_LOG(LogTemplateCharacter, Error,
+		       TEXT(
+			       "'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."
+		       ), *GetNameSafe(this));
 	}
 }
 
@@ -106,7 +160,7 @@ void ADatamoshTestCharacter::Move(const FInputActionValue& Value)
 
 		// get forward vector
 		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	
+
 		// get right vector 
 		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
@@ -118,6 +172,8 @@ void ADatamoshTestCharacter::Move(const FInputActionValue& Value)
 
 void ADatamoshTestCharacter::Look(const FInputActionValue& Value)
 {
+	if (IsMoshing) return;
+
 	// input is a Vector2D
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
 

@@ -5,7 +5,7 @@
 ===========================================================================*/
 
 #include "UObject/GeneratedCppIncludes.h"
-#include "DatamoshSceneViewExtension/Private/DatamoshSubsystem.h"
+#include "DatamoshSceneViewExtension/Public/DatamoshSubsystem.h"
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 void EmptyLinkFunctionForGeneratedCodeDatamoshSubsystem() {}
 
@@ -33,7 +33,7 @@ struct Z_Construct_UClass_UDatamoshSubsystem_Statics
 		{ "Comment", "/**\n * \n */" },
 #endif
 		{ "IncludePath", "DatamoshSubsystem.h" },
-		{ "ModuleRelativePath", "Private/DatamoshSubsystem.h" },
+		{ "ModuleRelativePath", "Public/DatamoshSubsystem.h" },
 	};
 #endif // WITH_METADATA
 	static UObject* (*const DependentSingletons[])();
@@ -80,14 +80,14 @@ UDatamoshSubsystem::~UDatamoshSubsystem() {}
 // End Class UDatamoshSubsystem
 
 // Begin Registration
-struct Z_CompiledInDeferFile_FID_Users_schro_Documents_Unreal_Projects_DatamoshTest_Plugins_DatamoshPlugin_Source_DatamoshSceneViewExtension_Private_DatamoshSubsystem_h_Statics
+struct Z_CompiledInDeferFile_FID_Users_schro_Documents_Unreal_Projects_DatamoshTest_Plugins_DatamoshPlugin_Source_DatamoshSceneViewExtension_Public_DatamoshSubsystem_h_Statics
 {
 	static constexpr FClassRegisterCompiledInInfo ClassInfo[] = {
-		{ Z_Construct_UClass_UDatamoshSubsystem, UDatamoshSubsystem::StaticClass, TEXT("UDatamoshSubsystem"), &Z_Registration_Info_UClass_UDatamoshSubsystem, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(UDatamoshSubsystem), 160224010U) },
+		{ Z_Construct_UClass_UDatamoshSubsystem, UDatamoshSubsystem::StaticClass, TEXT("UDatamoshSubsystem"), &Z_Registration_Info_UClass_UDatamoshSubsystem, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(UDatamoshSubsystem), 1679065162U) },
 	};
 };
-static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_Users_schro_Documents_Unreal_Projects_DatamoshTest_Plugins_DatamoshPlugin_Source_DatamoshSceneViewExtension_Private_DatamoshSubsystem_h_2332653403(TEXT("/Script/DatamoshPlugin"),
-	Z_CompiledInDeferFile_FID_Users_schro_Documents_Unreal_Projects_DatamoshTest_Plugins_DatamoshPlugin_Source_DatamoshSceneViewExtension_Private_DatamoshSubsystem_h_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_Users_schro_Documents_Unreal_Projects_DatamoshTest_Plugins_DatamoshPlugin_Source_DatamoshSceneViewExtension_Private_DatamoshSubsystem_h_Statics::ClassInfo),
+static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_Users_schro_Documents_Unreal_Projects_DatamoshTest_Plugins_DatamoshPlugin_Source_DatamoshSceneViewExtension_Public_DatamoshSubsystem_h_2179997076(TEXT("/Script/DatamoshPlugin"),
+	Z_CompiledInDeferFile_FID_Users_schro_Documents_Unreal_Projects_DatamoshTest_Plugins_DatamoshPlugin_Source_DatamoshSceneViewExtension_Public_DatamoshSubsystem_h_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_Users_schro_Documents_Unreal_Projects_DatamoshTest_Plugins_DatamoshPlugin_Source_DatamoshSceneViewExtension_Public_DatamoshSubsystem_h_Statics::ClassInfo),
 	nullptr, 0,
 	nullptr, 0);
 // End Registration
