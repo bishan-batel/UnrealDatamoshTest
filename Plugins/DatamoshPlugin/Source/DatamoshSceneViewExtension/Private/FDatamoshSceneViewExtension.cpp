@@ -99,12 +99,12 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		return SceneColor;
 	}
 
-	// if (Inputs.CustomDepthTexture->IsCulled())
-	// {
-	// 	UE_LOG(LogTemp, Warning, TEXT("Culled depth texture"));
-	// 	PreviousViewRect = {};
-	// 	return SceneColor;
-	// }
+	if (Inputs.CustomDepthTexture->IsCulled())
+	{
+		// UE_LOG(LogTemp, Warning, TEXT("Culled depth texture"));
+		PreviousViewRect = {};
+		return SceneColor;
+	}
 
 	FScreenPassTexture CustomDepthStencil{Inputs.CustomDepthTexture, ViewRect};
 
