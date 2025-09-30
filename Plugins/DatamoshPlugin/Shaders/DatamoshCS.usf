@@ -42,6 +42,51 @@ float Rand(const float2 St)
 	return frac(sin(dot(St.xy, float2(12.9898, 78.233))) * 43758.5453123);
 }
 
+float4 VelocityGaussianSample(
+	const float2 ScreenSize,
+	const float2 UvMin,
+	const float2 UvMax,
+	const float2 UvCenter
+)
+{
+	const float Guassian_Kernel[9] = {
+		1.0 / 16, 2.0 / 16, 1.0 / 16,
+		2.0 / 16, 4.0 / 16, 2.0 / 16,
+		1.0 / 16, 2.0 / 16, 1.0 / 16
+	};
+
+	const uint GaussianKernelSize = 9;
+
+	const float2 Offset = float2(1., 1.) / ScreenSize;
+
+	const float2 Offsets[9] = {
+		float2(-Offset.x, Offset.y), // top-left
+		float2(0.0f, Offset.y), // top-center
+		float2(Offset.x, Offset.y), // top-right
+		float2(-Offset.x, 0.0f), // center-left
+		float2(0.0f, 0.0f), // center-center
+		float2(Offset.x, 0.0f), // center-right
+		float2(-Offset.x, -Offset.y), // bottom-left
+		float2(0.0f, -Offset.y), // bottom-center
+		float2(Offset.x, -Offset.y) // bottom-right
+	};
+
+
+	float4 GuassianSample = float4(0., 0., 0., 0.);
+
+	for (uint i = 0; i < GaussianKernelSize; i++)
+	{
+		float2 Uv = clamp(UvCenter + Offsets[i], UvMin, UvMax);
+		float4 Sampled = Velocity.SampleLevel(DepthBufferSampler, Uv, 0);
+		GuassianSample.xyz +=
+		(length2(Sampled) == 0.
+			 ? Sampled.xyz
+			 : DecodeVelocityFromTexture(Sampled)) * Guassian_Kernel[i];
+	}
+
+	return GuassianSample;
+}
+
 float4 GaussianSample(
 	const Texture2D Texture,
 	const float2 ScreenSize,
@@ -92,7 +137,7 @@ float4 BoxSample(
 	const float2 UvCenter
 )
 {
-	const uint BoxKernelSize = 7;
+	const uint BoxKernelSize = 3;
 
 	const float2 Offset = float2(1., 1.) / ScreenSize;
 
@@ -165,16 +210,23 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	const float4 FragmentCustomDepth = CustomDepth.SampleLevel(DepthBufferSampler, CustomDepthUV, 0);
 
 	const float4 FragmentVelocity = Velocity.SampleLevel(DepthBufferSampler, FragmentVelocityUV, 0);
+	// const float4 FragmentVelocity = VelocityGaussianSample(
+	// 	SceneVelocityViewport_ViewportSize,
+	// 	SceneVelocityViewport_UVViewportMin,
+	// 	SceneVelocityViewport_UVViewportMax,
+	// 	FragmentVelocityUV
+	// );
 
+	// float3 ScreenSpaceVelocity = FragmentVelocity.xyz;
 	float3 ScreenSpaceVelocity =
 		length2(FragmentVelocity) > 0.
 			? DecodeVelocityFromTexture(FragmentVelocity)
 			: float3(0., 0., 0.);
 
-	ScreenSpaceVelocity.xy -= CameraInducedVelocity(FragmentDepth.r, SceneColorUV);
+	ScreenSpaceVelocity.xy += CameraInducedVelocity(FragmentDepth.r, SceneColorUV);
 	ScreenSpaceVelocity /= 2.f;
 
-	float2 FluidVelocity = BoxSample(
+	float2 FluidVelocity = GaussianSample(
 		VelocityFluid,
 		SceneColorViewport_ViewportSize,
 		SceneColorViewport_UVViewportMin,
@@ -182,24 +234,17 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		SceneColorUV
 	).xy;
 
-	FluidVelocity = BoxSample(
-		VelocityFluid,
-		SceneColorViewport_ViewportSize,
-		SceneColorViewport_UVViewportMin,
-		SceneColorViewport_UVViewportMax,
-		SceneColorUV + FluidVelocity
-	).xy;
-
-
-	FluidVelocity.xy *= 0.95;
+	FluidVelocity.xy *= 0.99;
 	FluidVelocity.xy += ScreenSpaceVelocity.xy;
 
 	float2 FluidOutput = FluidVelocity.xy;
 
 	// ScreenSpaceVelocity.xy += float2(0.0, 10.) * SceneColorViewport_ViewportSizeInverse * RandFast(DispatchThreadId);
 
-	const float2 Offset = ScreenSpaceVelocity * (0.5 + (round(RandFast(DispatchThreadId) * 5.f) / 5.f - 0.5f)) * 0.1;
-	// const float2 Offset = ScreenSpaceVelocity * 10.;
+	// const float2 Offset = ScreenSpaceVelocity * (0.5 + (round(RandFast(DispatchThreadId) * 5.f) / 5.f - 0.5f)) * 0.1;
+	const float2 Offset = ScreenSpaceVelocity + (0.5 + (round(
+		float2(RandFast(DispatchThreadId), RandFast(DispatchThreadId * 2))) * 5.f / 5.f - 0.5f)) * 0.00002;
+	// const float2 Offset = ScreenSpaceVelocity;
 
 	// const float2 Offset = FluidVelocity;
 
@@ -210,7 +255,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	// );
 	const float4 CanvasFragment = DatamoshCanvas.SampleLevel(
 		GlobalPointClampedSampler,
-		SceneColorUV + Offset.xy,
+		clamp(SceneColorUV + Offset.xy, SceneColorViewport_UVViewportMin, SceneColorViewport_UVViewportMax),
 		0
 	);
 
@@ -219,11 +264,9 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	if (FragmentCustomDepth.r > 0. && FragmentDepth <= FragmentCustomDepth.r)
 	{
 		SceneOutput = CanvasFragment;
-		// SceneOutput.g += 0.005;
-		// SceneOutput.rgb = float3(242., 66., 245.) / 255.;
 	}
-	// SceneOutput = float4(1., 0., 0., 1.);
-	// SceneOutput = CanvasFragment;
+	SceneOutput = CanvasFragment;
+	// SceneOutput = lerp(SceneOutput, CanvasFragment, clamp(length(FluidOutput) * 10. - 0.3, 0., 1.));
 
 	// SceneOutput = float4((ScreenSpaceVelocity.xy), length(ScreenSpaceVelocity.xy), 1.);
 

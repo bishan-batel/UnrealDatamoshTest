@@ -40,6 +40,8 @@
 "C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshPlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshPlugin\Module.DatamoshPlugin.cpp.obj"
 "C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshPlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshPlugin\DatamoshSubsystem.cpp.obj"
 "C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshPlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshPlugin\FDatamoshSceneViewExtension.cpp.obj"
+"C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshPlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshPlugin\DatamoshPlugin.init.gen.cpp.obj"
+"C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshPlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshPlugin\DatamoshSubsystem.gen.cpp.obj"
 "C:\Users\schro\Documents\Unreal Projects\DatamoshTest\Plugins\DatamoshPlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\DatamoshPlugin\Default.rc2.res"
 "..\Intermediate\Build\Win64\x64\UnrealEditor\Development\Core\UnrealEditor-Core.lib"
 "..\Intermediate\Build\Win64\x64\UnrealEditor\Development\CoreUObject\UnrealEditor-CoreUObject.lib"
