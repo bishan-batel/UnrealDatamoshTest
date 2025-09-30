@@ -2,9 +2,10 @@
 
 #include "PixelShaderUtils.h"
 #include "PostProcess/PostProcessMaterialInputs.h"
-#include "Runtime/Renderer/Private/SceneRendering.h"
+#include "SceneTextures.h"
 #include "ScreenPass.h"
 #include "SceneTexturesConfig.h"
+#include "Runtime/Renderer/Private/SceneRendering.h"
 #include "Runtime/Renderer/Private/SceneTextureParameters.h"
 
 
@@ -98,13 +99,14 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		return SceneColor;
 	}
 
-	FScreenPassTexture CustomDepthStencil{Inputs.CustomDepthTexture, ViewRect};
-
 	if (Inputs.CustomDepthTexture->IsCulled())
 	{
+		// UE_LOG(LogTemp, Warning, TEXT("Culled depth texture"));
 		PreviousViewRect = {};
 		return SceneColor;
 	}
+
+	FScreenPassTexture CustomDepthStencil{Inputs.CustomDepthTexture, ViewRect};
 
 
 	const auto SceneVelocity = FScreenPassTexture{SceneTextures.Velocity, ViewRect};

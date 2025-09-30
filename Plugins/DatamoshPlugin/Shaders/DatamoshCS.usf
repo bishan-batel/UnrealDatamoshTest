@@ -198,7 +198,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 
 	// ScreenSpaceVelocity.xy += float2(0.0, 10.) * SceneColorViewport_ViewportSizeInverse * RandFast(DispatchThreadId);
 
-	const float2 Offset = ScreenSpaceVelocity * (0.5 + (round(RandFast(DispatchThreadId) * 5.f) / 5.f - 0.5f));
+	const float2 Offset = ScreenSpaceVelocity * (0.5 + (round(RandFast(DispatchThreadId) * 5.f) / 5.f - 0.5f)) * 0.1;
 	// const float2 Offset = ScreenSpaceVelocity * 10.;
 
 	// const float2 Offset = FluidVelocity;
@@ -222,7 +222,8 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		// SceneOutput.g += 0.005;
 		// SceneOutput.rgb = float3(242., 66., 245.) / 255.;
 	}
-	SceneOutput = CanvasFragment;
+	// SceneOutput = float4(1., 0., 0., 1.);
+	// SceneOutput = CanvasFragment;
 
 	// SceneOutput = float4((ScreenSpaceVelocity.xy), length(ScreenSpaceVelocity.xy), 1.);
 
