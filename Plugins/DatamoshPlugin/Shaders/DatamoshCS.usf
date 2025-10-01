@@ -169,6 +169,29 @@ float2 CameraInducedVelocity(float depth, float2 ViewportUV)
 	return Velocity;
 }
 
+float2 InterpretSceneVelocity(float2 Uv, float Depth)
+{
+	const float4 Sampled = Velocity.SampleLevel(GlobalPointClampedSampler, Uv, 0);
+
+	if (length2(Sampled.xy) == 0.)
+	{
+		return Sampled.xy;
+	}
+
+	// 	float2 Decoded = Sampled.xy;
+	//
+	// 	const float InvDiv = 1.0f / (0.499f * 0.5f);
+	// 	// Decoded.xy = EncodedV.xy * InvDiv - 32767.0f / 65535.0f * InvDiv;
+	// 	Decoded.xy += 32767.0 / 65535. * InvDiv;
+	// 	Decoded.xy /= InvDiv;
+	//
+	// #if VELOCITY_ENCODE_GAMMA
+	// 	Decoded.xy = (Decoded.xy * abs(Decoded.xy)) * 0.5;
+	// #endif
+	//
+	return DecodeVelocityFromTexture(Sampled).xy;
+}
+
 // Compute Shader code
 [numthreads(THREADS_X, THREADS_Y, THREADS_Z)]
 void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
@@ -209,7 +232,8 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 
 	const float4 FragmentCustomDepth = CustomDepth.SampleLevel(DepthBufferSampler, CustomDepthUV, 0);
 
-	const float4 FragmentVelocity = Velocity.SampleLevel(DepthBufferSampler, FragmentVelocityUV, 0);
+	// const float4 FragmentVelocity = Velocity.SampleLevel(DepthBufferSampler, FragmentVelocityUV, 0);
+	const float2 ScreenSpaceVelocity = InterpretSceneVelocity(FragmentVelocityUV, FragmentDepth.r);
 	// const float4 FragmentVelocity = VelocityGaussianSample(
 	// 	SceneVelocityViewport_ViewportSize,
 	// 	SceneVelocityViewport_UVViewportMin,
@@ -218,15 +242,15 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	// );
 
 	// float3 ScreenSpaceVelocity = FragmentVelocity.xyz;
-	float3 ScreenSpaceVelocity =
-		length2(FragmentVelocity) > 0.
-			? DecodeVelocityFromTexture(FragmentVelocity)
-			: float3(0., 0., 0.);
+	// float3 ScreenSpaceVelocity =
+	// 	length2(FragmentVelocity) > 0.
+	// 		? DecodeVelocityFromTexture(FragmentVelocity)
+	// 		: float3(0., 0., 0.);
+	//
+	// ScreenSpaceVelocity.xy += CameraInducedVelocity(FragmentDepth.r, SceneColorUV);
+	// ScreenSpaceVelocity /= 2.f;
 
-	ScreenSpaceVelocity.xy += CameraInducedVelocity(FragmentDepth.r, SceneColorUV);
-	ScreenSpaceVelocity /= 2.f;
-
-	float2 FluidVelocity = GaussianSample(
+	float2 FluidVelocity = BoxSample(
 		VelocityFluid,
 		SceneColorViewport_ViewportSize,
 		SceneColorViewport_UVViewportMin,
@@ -234,17 +258,27 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		SceneColorUV
 	).xy;
 
-	FluidVelocity.xy *= 0.99;
-	FluidVelocity.xy += ScreenSpaceVelocity.xy;
+	if (length2(ScreenSpaceVelocity) > 0.001)
+	{
+		FluidVelocity.xy = ScreenSpaceVelocity.xy;
+	}
+	else
+	{
+		// FluidVelocity.xy -= sign(FluidVelocity) * 0.001;
+		FluidVelocity.xy *= 0.9;
+	}
 
 	float2 FluidOutput = FluidVelocity.xy;
 
 	// ScreenSpaceVelocity.xy += float2(0.0, 10.) * SceneColorViewport_ViewportSizeInverse * RandFast(DispatchThreadId);
 
 	// const float2 Offset = ScreenSpaceVelocity * (0.5 + (round(RandFast(DispatchThreadId) * 5.f) / 5.f - 0.5f)) * 0.1;
-	const float2 Offset = ScreenSpaceVelocity + (0.5 + (round(
-		float2(RandFast(DispatchThreadId), RandFast(DispatchThreadId * 2))) * 5.f / 5.f - 0.5f)) * 0.00002;
+	// const float2 Offset = ScreenSpaceVelocity + (0.5 + (round(
+	// 	float2(RandFast(DispatchThreadId), RandFast(DispatchThreadId * 2))) * 5.f / 5.f - 0.5f)) * 0.002;
 	// const float2 Offset = ScreenSpaceVelocity;
+	const float2 Offset = ScreenSpaceVelocity + ((round(float2(RandFast(DispatchThreadId),
+	                                                           RandFast(DispatchThreadId * 2))) * 5.f / 5.f - 0.5f)) *
+		0.02 * length(ScreenSpaceVelocity);
 
 	// const float2 Offset = FluidVelocity;
 
@@ -265,8 +299,13 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	{
 		SceneOutput = CanvasFragment;
 	}
-	SceneOutput = CanvasFragment;
-	// SceneOutput = lerp(SceneOutput, CanvasFragment, clamp(length(FluidOutput) * 10. - 0.3, 0., 1.));
+	else
+	{
+		// SceneOutput = lerp(SceneOutput, CanvasFragment, clamp(length2(FluidOutput) * 20000., 0., 1.));
+	}
+
+	// SceneOutput = float2();
+	// SceneOutput = CanvasFragment;
 
 	// SceneOutput = float4((ScreenSpaceVelocity.xy), length(ScreenSpaceVelocity.xy), 1.);
 

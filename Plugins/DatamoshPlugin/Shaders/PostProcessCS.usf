@@ -109,6 +109,15 @@ float4 BoxSample(
 	return Sample;
 }
 
+float2 IntepretSceneVelocity(float2 Uv)
+{
+	float4 Sampled = Velocity.SampleLevel(GlobalPointClampedSampler, Uv, 0);
+
+	float2 Decoded = Sampled.xy;
+
+	return Decoded.xy;
+}
+
 // Compute Shader code
 [numthreads(THREADS_X, THREADS_Y, THREADS_Z)]
 void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
@@ -132,14 +141,15 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 		SceneVelocityViewport_UVViewportMin;
 
 
-	const float4 FragmentVelocityEncoded = Velocity.SampleLevel(GlobalPointClampedSampler, VelocityUV, 0);
-	float3 FragmentVelocity = float3(0., 0., 0.);
+	// const float4 FragmentVelocityEncoded = Velocity.SampleLevel(GlobalPointClampedSampler, VelocityUV, 0);
+	// float3 FragmentVelocity = float3(0., 0., 0.);
+	const float2 FragmentVelocity = IntepretSceneVelocity(VelocityUV);
 
-	if (length2(FragmentVelocityEncoded) > 0.)
-	{
-		FragmentVelocity = DecodeVelocityFromTexture(FragmentVelocityEncoded);
-	}
-
+	// if (length2(FragmentVelocityEncoded) > 0.)
+	// {
+	// 	FragmentVelocity = DecodeVelocityFromTexture(FragmentVelocityEncoded);
+	// }
+	//
 	float2 FluidVelocityAtPoint = VelocityFluid.SampleLevel(
 		GlobalPointClampedSampler,
 		SceneColorUV,
