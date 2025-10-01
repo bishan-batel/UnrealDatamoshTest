@@ -195,7 +195,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 
 	float2 Offset = -ScreenSpaceVelocity;
 
-	const float RandomOffsetMultiplier = 0.4;
+	const float RandomOffsetMultiplier = 0.001;
 
 	Offset +=
 		((round((FluidVelocity + float2(RandFast(DispatchThreadId + uint2(100. * SceneColorUV)),
@@ -225,7 +225,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 
 	float4 SceneOutput = OriginalColor;
 
-	if (FragmentCustomDepth.r > 0.001 && FragmentDepth <= FragmentCustomDepth.r)
+	if (FragmentCustomDepth.r > 0. && FragmentDepth <= FragmentCustomDepth.r)
 	{
 		SceneOutput = CanvasFragment;
 	}
