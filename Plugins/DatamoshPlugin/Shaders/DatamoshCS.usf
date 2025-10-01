@@ -37,56 +37,6 @@ RWTexture2D<float4> DatamoshCanvasOutput;
 
 RWTexture2D<float4> VelocityFluidOutput;
 
-float Rand(const float2 St)
-{
-	return frac(sin(dot(St.xy, float2(12.9898, 78.233))) * 43758.5453123);
-}
-
-float4 VelocityGaussianSample(
-	const float2 ScreenSize,
-	const float2 UvMin,
-	const float2 UvMax,
-	const float2 UvCenter
-)
-{
-	const float Guassian_Kernel[9] = {
-		1.0 / 16, 2.0 / 16, 1.0 / 16,
-		2.0 / 16, 4.0 / 16, 2.0 / 16,
-		1.0 / 16, 2.0 / 16, 1.0 / 16
-	};
-
-	const uint GaussianKernelSize = 9;
-
-	const float2 Offset = float2(1., 1.) / ScreenSize;
-
-	const float2 Offsets[9] = {
-		float2(-Offset.x, Offset.y), // top-left
-		float2(0.0f, Offset.y), // top-center
-		float2(Offset.x, Offset.y), // top-right
-		float2(-Offset.x, 0.0f), // center-left
-		float2(0.0f, 0.0f), // center-center
-		float2(Offset.x, 0.0f), // center-right
-		float2(-Offset.x, -Offset.y), // bottom-left
-		float2(0.0f, -Offset.y), // bottom-center
-		float2(Offset.x, -Offset.y) // bottom-right
-	};
-
-
-	float4 GuassianSample = float4(0., 0., 0., 0.);
-
-	for (uint i = 0; i < GaussianKernelSize; i++)
-	{
-		float2 Uv = clamp(UvCenter + Offsets[i], UvMin, UvMax);
-		float4 Sampled = Velocity.SampleLevel(DepthBufferSampler, Uv, 0);
-		GuassianSample.xyz +=
-		(length2(Sampled) == 0.
-			 ? Sampled.xyz
-			 : DecodeVelocityFromTexture(Sampled)) * Guassian_Kernel[i];
-	}
-
-	return GuassianSample;
-}
-
 float4 GaussianSample(
 	const Texture2D Texture,
 	const float2 ScreenSize,
@@ -147,7 +97,8 @@ float4 BoxSample(
 	{
 		for (uint y = 0; y < BoxKernelSize; y++)
 		{
-			float2 Uv = clamp(UvCenter + float2(x, y) * Offset, UvMin, UvMax);
+			float2 Uv = clamp(UvCenter + (float2(x, y) - float2(BoxKernelSize, BoxKernelSize) * 0.5) * Offset, UvMin,
+			                  UvMax);
 			Sample += Texture.SampleLevel(GlobalPointClampedSampler, Uv, 0);
 		}
 	}
@@ -177,19 +128,12 @@ float2 InterpretSceneVelocity(float2 Uv, float Depth)
 	{
 		return Sampled.xy;
 	}
+	float2 FragmentVelocity = DecodeVelocityFromTexture(Sampled).xy;
 
-	// 	float2 Decoded = Sampled.xy;
-	//
-	// 	const float InvDiv = 1.0f / (0.499f * 0.5f);
-	// 	// Decoded.xy = EncodedV.xy * InvDiv - 32767.0f / 65535.0f * InvDiv;
-	// 	Decoded.xy += 32767.0 / 65535. * InvDiv;
-	// 	Decoded.xy /= InvDiv;
-	//
-	// #if VELOCITY_ENCODE_GAMMA
-	// 	Decoded.xy = (Decoded.xy * abs(Decoded.xy)) * 0.5;
-	// #endif
-	//
-	return DecodeVelocityFromTexture(Sampled).xy;
+	// This engine is made by illiterate psychopaths
+	FragmentVelocity.y *= -1;
+
+	return FragmentVelocity;
 }
 
 // Compute Shader code
@@ -232,85 +176,60 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 
 	const float4 FragmentCustomDepth = CustomDepth.SampleLevel(DepthBufferSampler, CustomDepthUV, 0);
 
-	// const float4 FragmentVelocity = Velocity.SampleLevel(DepthBufferSampler, FragmentVelocityUV, 0);
 	const float2 ScreenSpaceVelocity = InterpretSceneVelocity(FragmentVelocityUV, FragmentDepth.r);
-	// const float4 FragmentVelocity = VelocityGaussianSample(
-	// 	SceneVelocityViewport_ViewportSize,
-	// 	SceneVelocityViewport_UVViewportMin,
-	// 	SceneVelocityViewport_UVViewportMax,
-	// 	FragmentVelocityUV
-	// );
 
-	// float3 ScreenSpaceVelocity = FragmentVelocity.xyz;
-	// float3 ScreenSpaceVelocity =
-	// 	length2(FragmentVelocity) > 0.
-	// 		? DecodeVelocityFromTexture(FragmentVelocity)
-	// 		: float3(0., 0., 0.);
-	//
-	// ScreenSpaceVelocity.xy += CameraInducedVelocity(FragmentDepth.r, SceneColorUV);
-	// ScreenSpaceVelocity /= 2.f;
 
-	float2 FluidVelocity = BoxSample(
-		VelocityFluid,
-		SceneColorViewport_ViewportSize,
-		SceneColorViewport_UVViewportMin,
-		SceneColorViewport_UVViewportMax,
-		SceneColorUV
-	).xy;
+	float2 FluidVelocity = VelocityFluid.SampleLevel(GlobalPointClampedSampler, SceneColorUV + ScreenSpaceVelocity, 0).
+	                                     xy;
 
-	if (length2(ScreenSpaceVelocity) > 0.001)
+	if (length2(ScreenSpaceVelocity) > 0.0)
 	{
-		FluidVelocity.xy = ScreenSpaceVelocity.xy;
+		FluidVelocity.xy += ScreenSpaceVelocity.xy;
 	}
 	else
 	{
-		// FluidVelocity.xy -= sign(FluidVelocity) * 0.001;
-		FluidVelocity.xy *= 0.9;
 	}
+	FluidVelocity.xy *= 0.9;
 
 	float2 FluidOutput = FluidVelocity.xy;
 
-	// ScreenSpaceVelocity.xy += float2(0.0, 10.) * SceneColorViewport_ViewportSizeInverse * RandFast(DispatchThreadId);
+	float2 Offset = -ScreenSpaceVelocity;
 
-	// const float2 Offset = ScreenSpaceVelocity * (0.5 + (round(RandFast(DispatchThreadId) * 5.f) / 5.f - 0.5f)) * 0.1;
-	// const float2 Offset = ScreenSpaceVelocity + (0.5 + (round(
-	// 	float2(RandFast(DispatchThreadId), RandFast(DispatchThreadId * 2))) * 5.f / 5.f - 0.5f)) * 0.002;
-	// const float2 Offset = ScreenSpaceVelocity;
-	const float2 Offset = ScreenSpaceVelocity + ((round(float2(RandFast(DispatchThreadId),
-	                                                           RandFast(DispatchThreadId * 2))) * 5.f / 5.f - 0.5f)) *
-		0.02 * length(ScreenSpaceVelocity);
+	const float RandomOffsetMultiplier = 0.4;
 
-	// const float2 Offset = FluidVelocity;
+	Offset +=
+		((round((FluidVelocity + float2(RandFast(DispatchThreadId + uint2(100. * SceneColorUV)),
+		                                RandFast(DispatchThreadId * 2 + uint2(100. * SceneColorUV))))) * 5.f / 5.f -
+			0.5f))
+		* (RandomOffsetMultiplier * 0.01 * length(ScreenSpaceVelocity));
 
-	// const float4 CanvasFragment = DatamoshCanvas.SampleLevel(
-	// 	GlobalPointClampedSampler,
-	// 	clamp(SceneColorUV + Offset.xy, SceneColorViewport_UVViewportMin, SceneColorViewport_UVViewportMax),
-	// 	0
-	// );
-	const float4 CanvasFragment = DatamoshCanvas.SampleLevel(
+	float2 CanvasOffsetUV = SceneColorUV + Offset;
+
+	CanvasOffsetUV = clamp(CanvasOffsetUV, SceneColorViewport_UVViewportMin, SceneColorViewport_UVViewportMax);
+
+	float4 CanvasFragment = DatamoshCanvas.SampleLevel(
 		GlobalPointClampedSampler,
-		clamp(SceneColorUV + Offset.xy, SceneColorViewport_UVViewportMin, SceneColorViewport_UVViewportMax),
+		CanvasOffsetUV,
 		0
 	);
+	// float4 CanvasFragment = GaussianSample(
+	// 	DatamoshCanvas,
+	// 	SceneColorViewport_ViewportSize,
+	// 	SceneColorViewport_UVViewportMin,
+	// 	SceneColorViewport_UVViewportMax,
+	// 	CanvasOffsetUV
+	// );
+
+	// CanvasFragment.brg += 0.01 * float3(252., 3., 132.) / 255.;
+	// CanvasFragment.r += 0.001;
 
 	float4 SceneOutput = OriginalColor;
 
-	if (FragmentCustomDepth.r > 0. && FragmentDepth <= FragmentCustomDepth.r)
+	if (FragmentCustomDepth.r > 0.001 && FragmentDepth <= FragmentCustomDepth.r)
 	{
 		SceneOutput = CanvasFragment;
 	}
-	else
-	{
-		// SceneOutput = lerp(SceneOutput, CanvasFragment, clamp(length2(FluidOutput) * 20000., 0., 1.));
-	}
-
-	// SceneOutput = float2();
 	// SceneOutput = CanvasFragment;
-
-	// SceneOutput = float4((ScreenSpaceVelocity.xy), length(ScreenSpaceVelocity.xy), 1.);
-
-	// SceneOutput = lerp(OriginalColor, CanvasFragment, clamp(-100.f * FragmentDepth + 3.01f, 0., 1.));
-
 
 	Output[SceneWriteIndex] = SceneOutput;
 	DatamoshCanvasOutput[SceneWriteIndex] = SceneOutput;

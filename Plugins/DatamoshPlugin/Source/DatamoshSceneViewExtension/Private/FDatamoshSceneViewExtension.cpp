@@ -16,7 +16,7 @@ namespace
 {
 	TAutoConsoleVariable<int32> CVarShaderOn{
 		TEXT("r.DatamoshPlugin"),
-		0,
+		1,
 		TEXT("Enable Custom SceneViewExtension \n")
 		TEXT(" 0: OFF;")
 		TEXT(" 1: ON."),
@@ -54,7 +54,7 @@ void FDatamoshSceneViewExtension::SubscribeToPostProcessingPass(
 		return;
 	}
 
-	if (Pass == EPostProcessingPass::MotionBlur)
+	if (Pass == EPostProcessingPass::Tonemap)
 	{
 		InOutPassCallbacks.Add(
 			FAfterPassCallbackDelegate::CreateRaw(this, &FDatamoshSceneViewExtension::CustomPostProcessing)
@@ -69,28 +69,38 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 {
 	Inputs.Validate();
 
-	checkSlow(View.bIsViewInfo);
-	const FViewInfo& ViewInfo = static_cast<const FViewInfo&>(View);
-	const FIntRect ViewRect = ViewInfo.ViewRect;
-
-	const FSceneViewFamily& ViewFamily = *View.Family;
-
 	const FScreenPassTexture& SceneColor{
 		FScreenPassTexture::CopyFromSlice(
 			GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::SceneColor)
 		)
 	};
 
-
-	if (!SceneColor.IsValid() or CVarShaderOn.GetValueOnRenderThread())
+	// do nothing on this pass if datamoshing is invalid
+	if (CVarShaderOn.GetValueOnRenderThread() == 0)
 	{
 		return SceneColor;
 	}
+
+
+	// if texture is invalid idek what to do
+	if (not SceneColor.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Scene color isnt valid wtf"));
+		return SceneColor;
+	}
+
+	checkSlow(View.bIsViewInfo);
+	const FViewInfo& ViewInfo = static_cast<const FViewInfo&>(View);
+	const FIntRect ViewRect = ViewInfo.ViewRect;
+
+	const FSceneViewFamily& ViewFamily = *View.Family;
 
 	const FSceneTextures& SceneTextures = ViewInfo.GetSceneTextures();
 
 	FScreenPassTexture SceneDepth{SceneTextures.Depth.Target, ViewRect};
 
+
+	// or SceneColor.Texture-> Desc.Format != DatamoshCanvasPooled->GetDesc().Format
 
 	if (Inputs.CustomDepthTexture == nullptr)
 	{
@@ -99,9 +109,8 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		return SceneColor;
 	}
 
-	if (Inputs.CustomDepthTexture->IsCulled())
+	if (not Inputs.CustomDepthTexture->HasBeenProduced())
 	{
-		// UE_LOG(LogTemp, Warning, TEXT("Culled depth texture"));
 		PreviousViewRect = {};
 		return SceneColor;
 	}
@@ -109,10 +118,7 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 	FScreenPassTexture CustomDepthStencil{Inputs.CustomDepthTexture, ViewRect};
 
 
-	const auto SceneVelocity = FScreenPassTexture{SceneTextures.Velocity, ViewRect};
-	// const FScreenPassTexture& SceneVelocity = FScreenPassTexture::CopyFromSlice(
-	// 	GraphBuilder, Inputs.GetInput(EPostProcessMaterialInput::Velocity)
-	// );
+	const auto SceneVelocity = FScreenPassTexture{Inputs.GetInput(EPostProcessMaterialInput::Velocity)};
 
 	const FScreenPassTextureViewport SceneColorViewport{SceneColor};
 	const FScreenPassTextureViewport SceneVelocityViewport{SceneVelocity};
@@ -126,11 +132,27 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 
 	// Create / Get the Velocity Fluid Field & Datamosh Canvas
 
-	const bool DidViewportResize = PreviousViewRect.Size() != SceneColor.ViewRect.Size();
+	const bool DidViewportResize{PreviousViewRect.Size() != SceneColor.ViewRect.Size()};
 
 	if (DidViewportResize or VelocityFluidPooled == nullptr or DatamoshCanvasPooled == nullptr)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Creating First PreviousFramePoolTexture External Texture"));
+		if (DidViewportResize)
+		{
+			FString Str1 = PreviousViewRect.Size().ToString();
+			FString Str2 = SceneColor.ViewRect.Size().ToString();
+			UE_LOG(LogTemp, Warning, TEXT("Creating First PreviousFramePoolTexture External Texture (Resize %s -> %s)"),
+			       *Str1, *Str2);
+		}
+		else if (VelocityFluidPooled == nullptr)
+		{
+			UE_LOG(LogTemp, Warning,
+			       TEXT("Creating First PreviousFramePoolTexture External Texture (VelocityFluidPooled)"));
+		}
+		else if (DatamoshCanvasPooled == nullptr)
+		{
+			UE_LOG(LogTemp, Warning,
+			       TEXT("Creating First PreviousFramePoolTexture External Texture (DatamoshCanvasPooled)"));
+		}
 
 		// Save new view rect to prevent creating the texture again in further frames
 		PreviousViewRect = SceneColor.ViewRect;
@@ -156,11 +178,6 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		// Datamosh canvas has the same exact properties as SceneColor
 		DatamoshCanvasPooled = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
 	}
-
-	// if (FMath::RandRange(0.f, 1.f) < 0.002f)
-	// {
-	// 	DatamoshCanvasPooled = GraphBuilder.ConvertToExternalTexture(SceneColor.Texture);
-	// }
 
 	FRDGTexture* const VelocityFluidRef = GraphBuilder.RegisterExternalTexture(VelocityFluidPooled);
 
