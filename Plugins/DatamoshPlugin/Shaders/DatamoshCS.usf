@@ -115,7 +115,7 @@ float4 SampleDatamoshCanvas(float2 Uv)
 	{
 		Color = OriginalSceneColor.SampleLevel(
 			GlobalPointClampedSampler,
-			Uv + (Uv - ClampedUv),
+			ClampedUv,
 			0
 		);
 	}
@@ -200,23 +200,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 
 	float2 CanvasOffsetUV = SceneColorUV + Offset;
 
-	// float4 CanvasFragment = DatamoshCanvas.SampleLevel(
-	// 	GlobalPointClampedSampler,
-	// 	CanvasOffsetUV,
-	// 	1
-	// );
 	float4 CanvasFragment = SampleDatamoshCanvas(CanvasOffsetUV);
-	// float4 CanvasFragment = GaussianSample(
-	// 	DatamoshCanvas,
-	// 	SceneColorViewport_ViewportSize,
-	// 	SceneColorViewport_UVViewportMin,
-	// 	SceneColorViewport_UVViewportMax,
-	// 	CanvasOffsetUV
-	// );
-
-	// CanvasFragment.rgb += 1. * float3(252., 3., 132.) / 255. * lengthFast(float3(ScreenSpaceVelocity, 0.))
-	// 	* clamp(1. - FragmentDepth, 0., 1.);
-	// CanvasFragment.r += 0.001;
 
 	float4 SceneOutput = OriginalColor;
 
