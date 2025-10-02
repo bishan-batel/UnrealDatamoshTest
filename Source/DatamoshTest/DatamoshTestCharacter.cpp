@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "DatamoshTestCharacter.h"
+
+#include "DatamoshSubsystem.h"
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -68,44 +70,50 @@ void ADatamoshTestCharacter::RagdollAndDatamosh()
 	// GetWorldTimerManager().ClearTimer(DatamoshHandle);
 
 	// GetMesh()->ResetAllBodiesSimulatePhysics();
-	GetMesh()->SetAllBodiesSimulatePhysics(IsMoshing);
-	GetMesh()->SetSimulatePhysics(IsMoshing);
-	GetMesh()->SetRenderCustomDepth(IsMoshing);
+	// GetMesh()->SetRenderCustomDepth(IsMoshing);
 
-	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	if (UDatamoshSubsystem* DatamoshSubsystem = GEngine->GetEngineSubsystem<UDatamoshSubsystem>())
 	{
-		if (IsMoshing)
-		{
-			GetCharacterMovement()->DisableMovement();
-			// DisableInput(PlayerController);
-		}
-		else
-		{
-			GetCharacterMovement()->MovementMode = MOVE_Walking;
-
-			{
-				FAttachmentTransformRules AttachmentTransformRules{FAttachmentTransformRules::KeepRelativeTransform};
-				AttachmentTransformRules.bWeldSimulatedBodies = true;
-				CameraBoom->AttachToComponent(GetCapsuleComponent(), AttachmentTransformRules);
-			}
-
-			const FTransform Transform = GetCapsuleComponent()->GetComponentTransform();
-
-			FVector3d Location = Transform.GetLocation();
-			FRotator Rotation{Transform.GetRotation()};
-
-			Location.Z -= 97.;
-			Rotation.Yaw -= 90;
-
-
-			GetMesh()->SetWorldLocationAndRotation(Location, Rotation);
-
-			GetMesh()->AttachToComponent( //
-				GetCapsuleComponent(),
-				FAttachmentTransformRules{EAttachmentRule::KeepWorld, true}
-			);
-		}
+		DatamoshSubsystem->FullScreenDatamosh = IsMoshing;
 	}
+
+	// GetMesh()->SetAllBodiesSimulatePhysics(IsMoshing);
+	// GetMesh()->SetSimulatePhysics(IsMoshing);
+	//
+	// if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	// {
+	// 	if (IsMoshing)
+	// 	{
+	// 		GetCharacterMovement()->DisableMovement();
+	// 		// DisableInput(PlayerController);
+	// 	}
+	// 	else
+	// 	{
+	// 		GetCharacterMovement()->MovementMode = MOVE_Walking;
+	//
+	// 		{
+	// 			FAttachmentTransformRules AttachmentTransformRules{FAttachmentTransformRules::KeepRelativeTransform};
+	// 			AttachmentTransformRules.bWeldSimulatedBodies = true;
+	// 			CameraBoom->AttachToComponent(GetCapsuleComponent(), AttachmentTransformRules);
+	// 		}
+	//
+	// 		const FTransform Transform = GetCapsuleComponent()->GetComponentTransform();
+	//
+	// 		FVector3d Location = Transform.GetLocation();
+	// 		FRotator Rotation{Transform.GetRotation()};
+	//
+	// 		Location.Z -= 97.;
+	// 		Rotation.Yaw -= 90;
+	//
+	//
+	// 		GetMesh()->SetWorldLocationAndRotation(Location, Rotation);
+	//
+	// 		GetMesh()->AttachToComponent( //
+	// 			GetCapsuleComponent(),
+	// 			FAttachmentTransformRules{EAttachmentRule::KeepWorld, true}
+	// 		);
+	// 	}
+	// }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -172,7 +180,7 @@ void ADatamoshTestCharacter::Move(const FInputActionValue& Value)
 
 void ADatamoshTestCharacter::Look(const FInputActionValue& Value)
 {
-	if (IsMoshing) return;
+	// if (IsMoshing) return;
 
 	// input is a Vector2D
 	FVector2D LookAxisVector = Value.Get<FVector2D>();

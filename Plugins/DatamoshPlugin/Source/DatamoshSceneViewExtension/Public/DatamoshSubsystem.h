@@ -19,6 +19,9 @@ public:
 
 	virtual void Deinitialize() override;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Datamosh")
+	bool FullScreenDatamosh{false};
+
 private:
 	TSharedPtr<class FDatamoshSceneViewExtension, ESPMode::ThreadSafe> SceneExtension;
 };

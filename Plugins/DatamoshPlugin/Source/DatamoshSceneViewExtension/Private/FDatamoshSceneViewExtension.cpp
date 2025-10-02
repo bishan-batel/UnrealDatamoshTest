@@ -1,5 +1,6 @@
 #include "FDatamoshSceneViewExtension.h"
 
+#include "DatamoshSubsystem.h"
 #include "PixelShaderUtils.h"
 #include "PostProcess/PostProcessMaterialInputs.h"
 #include "SceneTextures.h"
@@ -258,8 +259,17 @@ FScreenPassTexture FDatamoshSceneViewExtension::CustomPostProcessing(
 		PassParameters->VelocityFluidOutput = GraphBuilder.CreateUAV(FRDGTextureUAVDesc{VelocityFluidOutputTexture});
 
 		PassParameters->SceneDepth = SceneDepth.Texture;
-	}
 
+		PassParameters->FullScreenDatamosh = false;
+
+		if (GEngine)
+		{
+			if (UDatamoshSubsystem* DatamoshSubsystem = GEngine->GetEngineSubsystem<UDatamoshSubsystem>())
+			{
+				PassParameters->FullScreenDatamosh = DatamoshSubsystem->FullScreenDatamosh;
+			}
+		}
+	}
 
 	// Add Compute Pass
 	{

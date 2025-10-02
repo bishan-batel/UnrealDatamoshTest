@@ -37,6 +37,10 @@ RWTexture2D<float4> DatamoshCanvasOutput;
 
 RWTexture2D<float4> VelocityFluidOutput;
 
+uint FullScreenDatamosh;
+
+const float RandomOffsetMultiplier = 100.;
+
 float4 GaussianSample(
 	const Texture2D Texture,
 	const float2 ScreenSize,
@@ -79,62 +83,55 @@ float4 GaussianSample(
 	return GuassianSample;
 }
 
-float4 BoxSample(
-	const Texture2D Texture,
-	const float2 ScreenSize,
-	const float2 UvMin,
-	const float2 UvMax,
-	const float2 UvCenter
-)
-{
-	const uint BoxKernelSize = 3;
-
-	const float2 Offset = float2(1., 1.) / ScreenSize;
-
-	float4 Sample = float4(0., 0., 0., 0.);
-
-	for (uint x = 0; x < BoxKernelSize; x++)
-	{
-		for (uint y = 0; y < BoxKernelSize; y++)
-		{
-			float2 Uv = clamp(UvCenter + (float2(x, y) - float2(BoxKernelSize, BoxKernelSize) * 0.5) * Offset, UvMin,
-			                  UvMax);
-			Sample += Texture.SampleLevel(GlobalPointClampedSampler, Uv, 0);
-		}
-	}
-
-	Sample /= float(BoxKernelSize * BoxKernelSize);
-
-	return Sample;
-}
-
-float2 CameraInducedVelocity(float depth, float2 ViewportUV)
-{
-	// Compute velocity due to camera motion.
-	float2 ScreenPos = 2 * float2(ViewportUV.x, 1 - ViewportUV.y) - 1;
-	float4 ThisClip = float4(ScreenPos, depth, 1);
-	float4 PrevClip = mul(ThisClip, View.ClipToPrevClip);
-	float2 PrevScreen = PrevClip.xy / PrevClip.w;
-	float2 Velocity = ScreenPos - PrevScreen;
-
-	return Velocity;
-}
-
-float2 InterpretSceneVelocity(float2 Uv, float Depth)
+float2 InterpretSceneVelocity(float2 Uv, float2 ViewportUV, float Depth)
 {
 	const float4 Sampled = Velocity.SampleLevel(GlobalPointClampedSampler, Uv, 0);
 
-	if (length2(Sampled.xy) == 0.)
-	{
-		return Sampled.xy;
-	}
-	float2 FragmentVelocity = DecodeVelocityFromTexture(Sampled).xy;
+	float2 FragmentVelocity = length2(Sampled.xy) == 0. ? Sampled.xy : DecodeVelocityFromTexture(Sampled).xy;
 
 	// This engine is made by illiterate psychopaths
 	FragmentVelocity.y *= -1;
 
+	// float2 ScreenSize = View.ViewSize.xy;
+	const float2 ScreenSize = SceneColorViewport_ViewportSize;
+	const float AspectRatio = ScreenSize.x / ScreenSize.y;
+
+	FragmentVelocity.y /= AspectRatio;
+	// FragmentVelocity.x *= AspectRatio;
+
+	// FragmentVelocity *= ScreenSize;
+	// FragmentVelocity = round(FragmentVelocity) * SceneColorViewport_ViewportSizeInverse;
+	// FragmentVelocity /= ScreenSize;
+
 	return FragmentVelocity;
 }
+
+float4 SampleDatamoshCanvas(float2 Uv)
+{
+	float4 Color;
+	float2 ClampedUv = clamp(Uv, SceneColorViewport_UVViewportMin, SceneColorViewport_UVViewportMax);
+
+	if (any(Uv > SceneColorViewport_UVViewportMax) || any(Uv < SceneColorViewport_ViewportMin))
+	{
+		Color = OriginalSceneColor.SampleLevel(
+			GlobalPointClampedSampler,
+			Uv + (Uv - ClampedUv),
+			0
+		);
+	}
+	else
+	{
+		Color = DatamoshCanvas.SampleLevel(
+			GlobalPointClampedSampler,
+			ClampedUv,
+			0
+		);
+	}
+
+
+	return Color;
+}
+
 
 // Compute Shader code
 [numthreads(THREADS_X, THREADS_Y, THREADS_Z)]
@@ -176,8 +173,7 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 
 	const float4 FragmentCustomDepth = CustomDepth.SampleLevel(DepthBufferSampler, CustomDepthUV, 0);
 
-	const float2 ScreenSpaceVelocity = InterpretSceneVelocity(FragmentVelocityUV, FragmentDepth.r);
-
+	const float2 ScreenSpaceVelocity = InterpretSceneVelocity(FragmentVelocityUV, SceneColorUV, FragmentDepth.r);
 
 	float2 FluidVelocity = VelocityFluid.SampleLevel(GlobalPointClampedSampler, SceneColorUV + ScreenSpaceVelocity, 0).
 	                                     xy;
@@ -195,23 +191,21 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 
 	float2 Offset = -ScreenSpaceVelocity;
 
-	const float RandomOffsetMultiplier = 0.001;
 
 	Offset +=
-		((round((FluidVelocity + float2(RandFast(DispatchThreadId + uint2(100. * SceneColorUV)),
-		                                RandFast(DispatchThreadId * 2 + uint2(100. * SceneColorUV))))) * 5.f / 5.f -
+		((round((float2(RandFast(DispatchThreadId + uint2(100. * SceneColorUV)),
+		                RandFast(DispatchThreadId * 2 + uint2(100. * SceneColorUV))))) * 5.f / 5.f -
 			0.5f))
 		* (RandomOffsetMultiplier * 0.01 * length(ScreenSpaceVelocity));
 
 	float2 CanvasOffsetUV = SceneColorUV + Offset;
 
-	CanvasOffsetUV = clamp(CanvasOffsetUV, SceneColorViewport_UVViewportMin, SceneColorViewport_UVViewportMax);
-
-	float4 CanvasFragment = DatamoshCanvas.SampleLevel(
-		GlobalPointClampedSampler,
-		CanvasOffsetUV,
-		0
-	);
+	// float4 CanvasFragment = DatamoshCanvas.SampleLevel(
+	// 	GlobalPointClampedSampler,
+	// 	CanvasOffsetUV,
+	// 	1
+	// );
+	float4 CanvasFragment = SampleDatamoshCanvas(CanvasOffsetUV);
 	// float4 CanvasFragment = GaussianSample(
 	// 	DatamoshCanvas,
 	// 	SceneColorViewport_ViewportSize,
@@ -220,12 +214,13 @@ void MainCS(uint2 DispatchThreadId : SV_DispatchThreadID)
 	// 	CanvasOffsetUV
 	// );
 
-	// CanvasFragment.brg += 0.01 * float3(252., 3., 132.) / 255.;
+	// CanvasFragment.rgb += 1. * float3(252., 3., 132.) / 255. * lengthFast(float3(ScreenSpaceVelocity, 0.))
+	// 	* clamp(1. - FragmentDepth, 0., 1.);
 	// CanvasFragment.r += 0.001;
 
 	float4 SceneOutput = OriginalColor;
 
-	if (FragmentCustomDepth.r > 0. && FragmentDepth <= FragmentCustomDepth.r)
+	if ((FragmentCustomDepth.r > 0. && FragmentDepth <= FragmentCustomDepth.r) || FullScreenDatamosh != 0)
 	{
 		SceneOutput = CanvasFragment;
 	}
